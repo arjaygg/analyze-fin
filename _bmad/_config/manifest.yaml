@@ -1,0 +1,12 @@
+installation:
+  version: 6.0.0-alpha.16
+  installDate: 2025-12-14T07:40:14.850Z
+  lastUpdated: 2025-12-14T07:40:14.850Z
+modules:
+  - core
+  - bmm
+customModules: []
+ides:
+  - claude-code
+  - cursor
+  - windsurf
