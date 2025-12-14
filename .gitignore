@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+venv/
+__pycache__/
+*.pyc
+
+# Python
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# IDE & Tool Configuration
+.serena/
+.cursor/
+.windsurf/
+
+# OS Files
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Local data and outputs (financial data should stay local)
+data/*.db
+data/sample_statements/*.pdf
+data/reports/
+data/exports/
+
+# Environment variables
+.env
+.env.local
+
+# Logs
+*.log
+logs/
