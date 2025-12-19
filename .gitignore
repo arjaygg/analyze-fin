@@ -10,6 +10,13 @@ __pycache__/
 dist/
 build/
 
+# Test artifacts
+.coverage
+htmlcov/
+.tox/
+tests/fixtures/*.db
+tests/fixtures/sample_statements/*.pdf
+
 # IDE & Tool Configuration
 .serena/
 .cursor/
