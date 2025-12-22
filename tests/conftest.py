@@ -184,10 +184,9 @@ def cli_runner():
             result = cli_runner.invoke(app, ["command", "--flag"])
             assert result.exit_code == 0
     """
-    # Placeholder - will be implemented with Typer CliRunner
-    # from typer.testing import CliRunner
-    # return CliRunner()
-    pass
+    from typer.testing import CliRunner
+
+    return CliRunner()
 
 
 @pytest.fixture
