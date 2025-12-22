@@ -5,12 +5,20 @@ Provides:
 - DuplicateDetector: Find duplicate transactions
 - DuplicateMatch: Representation of a duplicate pair
 - Exact and near-duplicate detection
+
+Performance:
+- Uses date-based indexing to avoid O(n²) comparisons
+- Content hash index for exact duplicate detection
+- Reference number index for bank-provided dedup
 """
 
+from collections import defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Any, Sequence
+from hashlib import md5
+from typing import Any
 
 
 @dataclass
@@ -70,22 +78,176 @@ class DuplicateDetector:
     ) -> list[DuplicateMatch]:
         """Find all duplicate pairs in a list of transactions.
 
+        Uses indexed approach for O(n) average case instead of O(n²):
+        1. Exact matches via content hash (O(n) build, O(1) lookup)
+        2. Reference number matches (O(n) build, O(1) lookup)
+        3. Near-duplicate detection via date bucketing (compare within same day only)
+
         Args:
             transactions: List of transaction dictionaries
 
         Returns:
             List of DuplicateMatch objects
         """
-        duplicates: list[DuplicateMatch] = []
+        if len(transactions) <= 1:
+            return []
 
-        # Compare each pair
-        for i, tx_a in enumerate(transactions):
-            for tx_b in transactions[i + 1:]:
-                match = self.is_duplicate(tx_a, tx_b)
-                if match:
-                    duplicates.append(match)
+        duplicates: list[DuplicateMatch] = []
+        seen_pairs: set[tuple[int, int]] = set()  # Track compared pairs by index
+
+        # Build indexes for efficient lookup
+        content_hash_index = self._build_content_hash_index(transactions)
+        reference_index = self._build_reference_index(transactions)
+        date_index = self._build_date_index(transactions)
+
+        # Step 1: Find exact duplicates via content hash (highest confidence)
+        for tx_hash, indices in content_hash_index.items():
+            if len(indices) > 1:
+                for i in range(len(indices)):
+                    for j in range(i + 1, len(indices)):
+                        idx_a, idx_b = indices[i], indices[j]
+                        pair_key = (min(idx_a, idx_b), max(idx_a, idx_b))
+                        if pair_key not in seen_pairs:
+                            match = self.is_duplicate(
+                                transactions[idx_a], transactions[idx_b]
+                            )
+                            if match:
+                                duplicates.append(match)
+                            seen_pairs.add(pair_key)
+
+        # Step 2: Find duplicates via reference number
+        for ref_num, indices in reference_index.items():
+            if len(indices) > 1:
+                for i in range(len(indices)):
+                    for j in range(i + 1, len(indices)):
+                        idx_a, idx_b = indices[i], indices[j]
+                        pair_key = (min(idx_a, idx_b), max(idx_a, idx_b))
+                        if pair_key not in seen_pairs:
+                            match = self.is_duplicate(
+                                transactions[idx_a], transactions[idx_b]
+                            )
+                            if match:
+                                duplicates.append(match)
+                            seen_pairs.add(pair_key)
+
+        # Step 3: Find near-duplicates via date bucketing
+        # Only compare transactions on the same date or adjacent dates
+        sorted_dates = sorted(date_index.keys())
+        for i, current_date in enumerate(sorted_dates):
+            # Get indices for current date
+            current_indices = date_index[current_date]
+
+            # Compare within same date
+            self._compare_indices(
+                transactions, current_indices, current_indices,
+                duplicates, seen_pairs
+            )
+
+            # Compare with next date (for cross-midnight near-duplicates)
+            if i + 1 < len(sorted_dates):
+                next_date = sorted_dates[i + 1]
+                if (next_date - current_date).days <= 1:
+                    next_indices = date_index[next_date]
+                    self._compare_indices(
+                        transactions, current_indices, next_indices,
+                        duplicates, seen_pairs
+                    )
 
         return duplicates
+
+    def _build_content_hash_index(
+        self, transactions: Sequence[dict[str, Any]]
+    ) -> dict[str, list[int]]:
+        """Build index mapping content hash to transaction indices.
+
+        Content hash is computed from date + amount + normalized description.
+        """
+        index: dict[str, list[int]] = defaultdict(list)
+
+        for idx, tx in enumerate(transactions):
+            tx_hash = self._compute_content_hash(tx)
+            if tx_hash:
+                index[tx_hash].append(idx)
+
+        return dict(index)
+
+    def _build_reference_index(
+        self, transactions: Sequence[dict[str, Any]]
+    ) -> dict[str, list[int]]:
+        """Build index mapping reference numbers to transaction indices."""
+        index: dict[str, list[int]] = defaultdict(list)
+
+        for idx, tx in enumerate(transactions):
+            ref = tx.get("reference_number")
+            if ref:
+                index[str(ref).strip().upper()].append(idx)
+
+        return dict(index)
+
+    def _build_date_index(
+        self, transactions: Sequence[dict[str, Any]]
+    ) -> dict[datetime, list[int]]:
+        """Build index mapping dates (day only) to transaction indices."""
+        index: dict[datetime, list[int]] = defaultdict(list)
+
+        for idx, tx in enumerate(transactions):
+            date = tx.get("date")
+            if isinstance(date, datetime):
+                # Use date only (not time) for bucketing
+                day_key = datetime(date.year, date.month, date.day)
+                index[day_key].append(idx)
+
+        return dict(index)
+
+    def _compute_content_hash(self, tx: dict[str, Any]) -> str | None:
+        """Compute content hash for a transaction.
+
+        Hash is based on: date (day only) + amount + normalized description.
+        Returns None if required fields are missing.
+        """
+        date = tx.get("date")
+        amount = tx.get("amount")
+        description = tx.get("description", "")
+
+        if not date or amount is None:
+            return None
+
+        # Normalize components
+        date_str = date.strftime("%Y-%m-%d") if isinstance(date, datetime) else str(date)
+        amount_str = f"{float(amount):.2f}"
+        desc_normalized = description.upper().strip()[:50]  # First 50 chars
+
+        content = f"{date_str}|{amount_str}|{desc_normalized}"
+        return md5(content.encode()).hexdigest()
+
+    def _compare_indices(
+        self,
+        transactions: Sequence[dict[str, Any]],
+        indices_a: list[int],
+        indices_b: list[int],
+        duplicates: list[DuplicateMatch],
+        seen_pairs: set[tuple[int, int]],
+    ) -> None:
+        """Compare transactions between two index lists.
+
+        If indices_a == indices_b, compares within the list (avoiding self-comparison).
+        """
+        same_list = indices_a is indices_b
+
+        for i, idx_a in enumerate(indices_a):
+            start_j = i + 1 if same_list else 0
+            for idx_b in (indices_b[start_j:] if same_list else indices_b):
+                if idx_a == idx_b:
+                    continue
+
+                pair_key = (min(idx_a, idx_b), max(idx_a, idx_b))
+                if pair_key in seen_pairs:
+                    continue
+
+                match = self.is_duplicate(transactions[idx_a], transactions[idx_b])
+                if match:
+                    duplicates.append(match)
+                seen_pairs.add(pair_key)
 
     def is_duplicate(
         self, tx_a: dict[str, Any], tx_b: dict[str, Any]
@@ -271,6 +433,9 @@ class DuplicateDetector:
     ) -> list[list[dict[str, Any]]]:
         """Group transactions that are duplicates of each other.
 
+        Uses transaction indices (not object IDs) for stable grouping
+        that works across sessions.
+
         Args:
             transactions: List of transactions
 
@@ -283,40 +448,46 @@ class DuplicateDetector:
         if not duplicates:
             return []
 
-        # Build adjacency list
-        tx_ids = {id(tx): tx for tx in transactions}
-        adjacency: dict[int, set[int]] = {id(tx): set() for tx in transactions}
+        # Build transaction index lookup
+        tx_list = list(transactions)
+        tx_to_idx: dict[int, int] = {id(tx): idx for idx, tx in enumerate(tx_list)}
+
+        # Build adjacency list using indices (not object IDs)
+        adjacency: dict[int, set[int]] = defaultdict(set)
 
         for dup in duplicates:
-            id_a = id(dup.transaction_a)
-            id_b = id(dup.transaction_b)
-            adjacency[id_a].add(id_b)
-            adjacency[id_b].add(id_a)
+            idx_a = tx_to_idx.get(id(dup.transaction_a))
+            idx_b = tx_to_idx.get(id(dup.transaction_b))
+            if idx_a is not None and idx_b is not None:
+                adjacency[idx_a].add(idx_b)
+                adjacency[idx_b].add(idx_a)
 
         # Find connected components using BFS
         visited: set[int] = set()
         groups: list[list[dict[str, Any]]] = []
 
-        for tx_id in adjacency:
-            if tx_id in visited or not adjacency[tx_id]:
+        for tx_idx in adjacency:
+            if tx_idx in visited:
                 continue
 
             # BFS to find all connected transactions
-            group: list[dict[str, Any]] = []
-            queue = [tx_id]
+            group_indices: list[int] = []
+            queue = [tx_idx]
 
             while queue:
                 current = queue.pop(0)
                 if current in visited:
                     continue
                 visited.add(current)
-                group.append(tx_ids[current])
+                group_indices.append(current)
 
                 for neighbor in adjacency[current]:
                     if neighbor not in visited:
                         queue.append(neighbor)
 
-            if len(group) > 1:  # Only include groups with actual duplicates
+            if len(group_indices) > 1:  # Only include groups with actual duplicates
+                # Convert indices back to transactions
+                group = [tx_list[idx] for idx in sorted(group_indices)]
                 groups.append(group)
 
         return groups
