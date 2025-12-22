@@ -13,7 +13,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, Numeric, String, func
+from sqlalchemy import Boolean, ForeignKey, Index, Numeric, String, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 if TYPE_CHECKING:
@@ -83,19 +83,50 @@ class Transaction(Base):
 
     Represents a single financial transaction from a bank statement.
     Amount is stored as Decimal for currency precision.
+
+    Categorization fields are populated after parsing:
+    - category: Assigned category (e.g., "Food & Dining")
+    - merchant_normalized: Properly-cased merchant name (e.g., "Jollibee")
+    - confidence: Extraction/categorization confidence (0.0 to 1.0)
+
+    Deduplication fields:
+    - reference_number: Bank-provided reference (if available)
+    - is_duplicate: True if marked as duplicate of another transaction
+    - duplicate_of_id: ID of the original transaction (if duplicate)
     """
 
     __tablename__ = "transactions"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     statement_id: Mapped[int] = mapped_column(ForeignKey("statements.id"))
-    date: Mapped[datetime] = mapped_column()
+    date: Mapped[datetime] = mapped_column(index=True)
     description: Mapped[str] = mapped_column(String(500))
     amount: Mapped[Decimal] = mapped_column(Numeric(10, 2))  # Up to 99,999,999.99
     created_at: Mapped[datetime] = mapped_column(default=func.now())
 
+    # Categorization fields
+    category: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    merchant_normalized: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    confidence: Mapped[float | None] = mapped_column(Numeric(3, 2), nullable=True)  # 0.00 to 1.00
+
+    # Deduplication fields
+    reference_number: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    is_duplicate: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    duplicate_of_id: Mapped[int | None] = mapped_column(
+        ForeignKey("transactions.id"), nullable=True
+    )
+
     # Relationships
     statement: Mapped["Statement"] = relationship("Statement", back_populates="transactions")
+    duplicate_of: Mapped["Transaction | None"] = relationship(
+        "Transaction", remote_side=[id], foreign_keys=[duplicate_of_id]
+    )
+
+    # Composite indexes for common queries
+    __table_args__ = (
+        Index("ix_transactions_date_category", "date", "category"),
+        Index("ix_transactions_statement_date", "statement_id", "date"),
+    )
 
     def __repr__(self) -> str:
-        return f"<Transaction(id={self.id}, date={self.date}, amount={self.amount})>"
+        return f"<Transaction(id={self.id}, date={self.date}, amount={self.amount}, category='{self.category}')>"
