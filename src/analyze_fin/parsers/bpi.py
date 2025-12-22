@@ -3,7 +3,7 @@ BPI PDF statement parser.
 
 BPI (Bank of the Philippine Islands) statement format:
 - Date format: "MM/DD/YYYY" (e.g., "11/15/2024")
-- Password-protected PDFs (password: SURNAME + last 4 digits)
+- Password-protected PDFs (password provided by user)
 - Table columns: Date | Description | Debit | Credit | Balance
 """
 
@@ -22,16 +22,16 @@ class BPIParser(BaseBankParser):
     """Parser for BPI PDF bank statements.
 
     Handles password-protected PDFs common with BPI statements.
-    Password format: SURNAME + last 4 phone digits (e.g., "GARCIA1234")
+    Password should be provided by the user when calling parse().
 
     Example:
         parser = BPIParser()
-        result = parser.parse(Path("bpi_statement.pdf"), password="GARCIA1234")
+        result = parser.parse(Path("bpi_statement.pdf"), password="your_password")
         for tx in result.transactions:
             print(f"{tx.date}: {tx.description} - {tx.amount}")
 
     Security Note:
-        Password is used only for PDF decryption and is never stored.
+        Password is used only for PDF decryption and is never stored or logged.
     """
 
     def extract_transactions(self, pdf_path: Path) -> list[RawTransaction]:
@@ -53,7 +53,7 @@ class BPIParser(BaseBankParser):
 
         Args:
             pdf_path: Path to the BPI PDF file
-            password: Password for protected PDFs (SURNAME + last 4 digits)
+            password: Password for protected PDFs (if required)
 
         Returns:
             ParseResult with transactions, quality score, and metadata
@@ -98,12 +98,12 @@ class BPIParser(BaseBankParser):
                     "PDF is password-protected. Provide password parameter.",
                     file_path=str(pdf_path),
                     reason="Password required",
-                )
+                ) from e
             raise ParseError(
                 f"Failed to parse BPI PDF: {e}",
                 file_path=str(pdf_path),
                 reason=str(e),
-            )
+            ) from e
 
         quality_score = self.calculate_quality_score(transactions)
 
@@ -226,4 +226,4 @@ class BPIParser(BaseBankParser):
                 amount = -amount
             return amount
         except InvalidOperation as e:
-            raise ValueError(f"Cannot parse amount '{amount_str}': {e}")
+            raise ValueError(f"Cannot parse amount '{amount_str}': {e}") from e
