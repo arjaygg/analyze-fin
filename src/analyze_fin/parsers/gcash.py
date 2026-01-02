@@ -62,8 +62,16 @@ class GCashParser(BaseBankParser):
             ParseResult with transactions, quality score, and metadata
 
         Raises:
-            ParseError: If PDF cannot be parsed
+            ParseError: If PDF cannot be parsed or file doesn't exist
         """
+        # Validate file exists
+        if not pdf_path.exists():
+            raise ParseError(
+                f"File not found: {pdf_path}",
+                file_path=str(pdf_path),
+                reason="File does not exist",
+            )
+
         transactions: list[RawTransaction] = []
         parsing_errors: list[str] = []
 
@@ -100,7 +108,7 @@ class GCashParser(BaseBankParser):
                 f"Failed to parse GCash PDF: {e}",
                 file_path=str(pdf_path),
                 reason=str(e),
-            )
+            ) from e
 
         quality_score = self.calculate_quality_score(transactions)
 
@@ -231,4 +239,4 @@ class GCashParser(BaseBankParser):
                 amount = -amount
             return amount
         except InvalidOperation as e:
-            raise ValueError(f"Cannot parse amount '{amount_str}': {e}")
+            raise ValueError(f"Cannot parse amount '{amount_str}': {e}") from e

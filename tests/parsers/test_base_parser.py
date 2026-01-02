@@ -11,11 +11,11 @@ BaseBankParser should:
 - Have detect_bank_type() method
 """
 
-import pytest
 from abc import ABC
-from decimal import Decimal
 from datetime import datetime
-from pathlib import Path
+from decimal import Decimal
+
+import pytest
 
 
 class TestBaseBankParserStructure:
@@ -42,8 +42,8 @@ class TestBaseBankParserStructure:
 
     def test_base_parser_has_extract_transactions_abstract_method(self):
         """BaseBankParser declares extract_transactions as abstract."""
+
         from analyze_fin.parsers.base import BaseBankParser
-        import inspect
 
         # Check that extract_transactions is defined
         assert hasattr(BaseBankParser, "extract_transactions")
@@ -102,7 +102,7 @@ class TestParseResult:
 
     def test_parse_result_has_required_fields(self):
         """ParseResult has transactions, quality_score, bank_type."""
-        from analyze_fin.parsers.base import ParseResult, RawTransaction
+        from analyze_fin.parsers.base import ParseResult
 
         result = ParseResult(
             transactions=[],
@@ -145,10 +145,8 @@ class TestQualityScoreCalculation:
 
     def test_quality_score_high_confidence_transactions(self):
         """High confidence transactions yield high quality score (>= 0.95)."""
-        from analyze_fin.parsers.base import RawTransaction
-
         # Create a concrete implementation for testing
-        from analyze_fin.parsers.base import BaseBankParser
+        from analyze_fin.parsers.base import BaseBankParser, RawTransaction
 
         class TestParser(BaseBankParser):
             def extract_transactions(self, pdf_path):
@@ -181,7 +179,7 @@ class TestQualityScoreCalculation:
 
     def test_quality_score_low_confidence_transactions(self):
         """Low confidence transactions yield low quality score (< 0.90)."""
-        from analyze_fin.parsers.base import RawTransaction, BaseBankParser
+        from analyze_fin.parsers.base import BaseBankParser, RawTransaction
 
         class TestParser(BaseBankParser):
             def extract_transactions(self, pdf_path):
@@ -220,7 +218,7 @@ class TestQualityScoreCalculation:
 
     def test_quality_score_default_confidence_is_one(self):
         """Transactions without confidence default to 1.0."""
-        from analyze_fin.parsers.base import RawTransaction, BaseBankParser
+        from analyze_fin.parsers.base import BaseBankParser, RawTransaction
 
         class TestParser(BaseBankParser):
             def extract_transactions(self, pdf_path):

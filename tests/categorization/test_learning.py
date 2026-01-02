@@ -5,7 +5,6 @@ Story 2.4 AC: Learn from user corrections and custom mappings.
 RED phase - these tests will fail until learning.py is implemented.
 """
 
-import pytest
 import json
 import tempfile
 from pathlib import Path

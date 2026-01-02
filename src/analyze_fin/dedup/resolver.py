@@ -8,10 +8,11 @@ Provides:
 """
 
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
 from analyze_fin.dedup.detector import DuplicateMatch
 

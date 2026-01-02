@@ -19,18 +19,13 @@ Acceptance Criteria:
 Test Status: 🔴 RED (Failing - awaiting implementation)
 """
 
+
 import pytest
-from pathlib import Path
-from decimal import Decimal
-import json
 
 # These imports will fail until implementation exists
 # from src.analyze_fin.categorization.categorizer import MerchantCategorizer
 # from src.analyze_fin.categorization.normalizer import MerchantNormalizer
 # from src.analyze_fin.categorization.learning import LearningEngine
-
-from tests.support.helpers import assert_categorized
-
 
 # ============================================================================
 # AC1: Auto-categorize transactions using merchant mapping (>90% accuracy)

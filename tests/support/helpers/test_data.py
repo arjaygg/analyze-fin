@@ -5,11 +5,10 @@ Provides utilities to generate transactions, statements, and other
 test data that closely mimics real-world data.
 """
 
+import random
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import List, Dict, Any
-import random
-
+from typing import Any
 
 # Philippine merchants for realistic test data
 # Categories aligned with analyze_fin.categorization.taxonomy
@@ -38,7 +37,7 @@ def generate_transaction(
     category: str = None,
     amount: Decimal = None,
     **overrides
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Generate a realistic transaction.
 
@@ -83,7 +82,7 @@ def generate_transaction(
     return transaction
 
 
-def generate_transactions(count: int, **kwargs) -> List[Dict[str, Any]]:
+def generate_transactions(count: int, **kwargs) -> list[dict[str, Any]]:
     """
     Generate multiple transactions.
 
@@ -101,7 +100,7 @@ def generate_monthly_transactions(
     year: int,
     month: int,
     count: int = 20
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     Generate transactions for a specific month.
 
@@ -141,7 +140,7 @@ def generate_statement_data(
     year: int = None,
     month: int = None,
     transaction_count: int = 20
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Generate complete statement data with transactions.
 
@@ -180,7 +179,7 @@ def generate_statement_data(
     }
 
 
-def generate_duplicate_transaction(original: Dict[str, Any]) -> Dict[str, Any]:
+def generate_duplicate_transaction(original: dict[str, Any]) -> dict[str, Any]:
     """
     Create a duplicate of a transaction (for testing deduplication).
 
@@ -200,9 +199,9 @@ def generate_duplicate_transaction(original: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def generate_near_duplicate_transaction(
-    original: Dict[str, Any],
+    original: dict[str, Any],
     time_delta_seconds: int = 60
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Create a near-duplicate transaction (slightly different timestamp).
 

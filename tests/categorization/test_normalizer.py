@@ -5,7 +5,6 @@ Story 2.3 AC: Merchant normalization with fuzzy matching.
 RED phase - these tests will fail until normalizer.py is implemented.
 """
 
-import pytest
 
 
 class TestNormalizerStructure:

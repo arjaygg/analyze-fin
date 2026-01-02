@@ -8,9 +8,8 @@ When models are implemented, use these patterns for testing:
 - Queries
 """
 
+
 import pytest
-from decimal import Decimal
-from datetime import datetime
 
 
 @pytest.mark.database

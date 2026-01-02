@@ -5,7 +5,6 @@ Story 3.2 AC: Resolve duplicate transactions (mark, ignore, merge).
 RED phase - these tests will fail until resolver.py is implemented.
 """
 
-import pytest
 import json
 import tempfile
 from datetime import datetime
@@ -297,8 +296,8 @@ class TestAutoResolve:
 
     def test_auto_resolve_exact_duplicates(self):
         """auto_resolve automatically resolves exact duplicates."""
+        from analyze_fin.dedup.detector import DuplicateDetector
         from analyze_fin.dedup.resolver import DuplicateResolver
-        from analyze_fin.dedup.detector import DuplicateDetector, DuplicateMatch
 
         resolver = DuplicateResolver()
         detector = DuplicateDetector()
@@ -327,8 +326,8 @@ class TestAutoResolve:
 
     def test_auto_resolve_keeps_first_by_default(self):
         """auto_resolve keeps first transaction by default."""
-        from analyze_fin.dedup.resolver import DuplicateResolver
         from analyze_fin.dedup.detector import DuplicateMatch
+        from analyze_fin.dedup.resolver import DuplicateResolver
 
         resolver = DuplicateResolver()
 
@@ -352,8 +351,8 @@ class TestAutoResolve:
 
     def test_auto_resolve_respects_threshold(self):
         """auto_resolve only resolves above confidence threshold."""
-        from analyze_fin.dedup.resolver import DuplicateResolver
         from analyze_fin.dedup.detector import DuplicateMatch
+        from analyze_fin.dedup.resolver import DuplicateResolver
 
         resolver = DuplicateResolver()
 

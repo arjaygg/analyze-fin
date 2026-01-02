@@ -5,9 +5,8 @@ Story 2.2 AC: Rule-based categorizer using taxonomy and patterns.
 RED phase - these tests will fail until categorizer.py is implemented.
 """
 
-import pytest
-from decimal import Decimal
 from datetime import datetime
+from decimal import Decimal
 
 
 class TestCategorizerStructure:

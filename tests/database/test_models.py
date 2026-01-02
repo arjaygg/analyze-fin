@@ -10,11 +10,11 @@ Tables:
 - transactions (id, statement_id FK, date, description, amount, created_at)
 """
 
-import pytest
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import create_engine, inspect
+import pytest
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import Session
 
 
@@ -289,6 +289,7 @@ class TestForeignKeyConstraints:
     def test_cannot_create_statement_without_valid_account(self, db_session):
         """Statement requires valid account_id."""
         from sqlalchemy.exc import IntegrityError
+
         from analyze_fin.database.models import Statement
 
         statement = Statement(
@@ -304,6 +305,7 @@ class TestForeignKeyConstraints:
     def test_cannot_create_transaction_without_valid_statement(self, db_session):
         """Transaction requires valid statement_id."""
         from sqlalchemy.exc import IntegrityError
+
         from analyze_fin.database.models import Transaction
 
         transaction = Transaction(
@@ -334,6 +336,40 @@ class TestBaseModel:
         assert issubclass(Account, Base)
         assert issubclass(Statement, Base)
         assert issubclass(Transaction, Base)
+
+
+class TestSessionModule:
+    """Test database session configuration."""
+
+    def test_session_module_exists(self):
+        """Session module can be imported."""
+        from analyze_fin.database.session import get_engine, get_session
+        assert get_engine is not None
+        assert get_session is not None
+
+    def test_wal_mode_enabled(self, temp_db):
+        """SQLite WAL mode is enabled by default."""
+        from analyze_fin.database.session import get_engine
+
+        engine = get_engine(temp_db)
+        with engine.connect() as conn:
+            result = conn.execute(text("PRAGMA journal_mode")).fetchone()
+            assert result[0].lower() == "wal"
+
+    def test_foreign_keys_enabled(self, temp_db):
+        """SQLite foreign keys are enabled."""
+        from analyze_fin.database.session import get_engine
+
+        engine = get_engine(temp_db)
+        with engine.connect() as conn:
+            result = conn.execute(text("PRAGMA foreign_keys")).fetchone()
+            assert result[0] == 1
+
+
+@pytest.fixture
+def temp_db(tmp_path):
+    """Create a temporary database file path."""
+    return str(tmp_path / "test.db")
 
 
 # ============================================================================

@@ -10,11 +10,12 @@ GCash statement format:
 - Table columns: Date | Description | Reference | Debit | Credit | Balance
 """
 
-import pytest
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 class TestGCashParserStructure:
@@ -28,8 +29,8 @@ class TestGCashParserStructure:
 
     def test_gcash_parser_inherits_from_base(self):
         """GCashParser inherits from BaseBankParser."""
-        from analyze_fin.parsers.gcash import GCashParser
         from analyze_fin.parsers.base import BaseBankParser
+        from analyze_fin.parsers.gcash import GCashParser
 
         assert issubclass(GCashParser, BaseBankParser)
 
@@ -152,8 +153,8 @@ class TestGCashRowExtraction:
 
     def test_extract_transaction_from_row(self):
         """Extract transaction from a table row."""
-        from analyze_fin.parsers.gcash import GCashParser
         from analyze_fin.parsers.base import RawTransaction
+        from analyze_fin.parsers.gcash import GCashParser
 
         parser = GCashParser()
 
@@ -200,8 +201,8 @@ class TestGCashParseMethod:
 
     def test_parse_returns_parse_result(self):
         """parse() returns ParseResult object."""
-        from analyze_fin.parsers.gcash import GCashParser
         from analyze_fin.parsers.base import ParseResult
+        from analyze_fin.parsers.gcash import GCashParser
 
         parser = GCashParser()
 
@@ -255,8 +256,8 @@ class TestGCashParseMethod:
 
     def test_parse_invalid_pdf_raises_parse_error(self):
         """parse() raises ParseError for invalid PDF."""
-        from analyze_fin.parsers.gcash import GCashParser
         from analyze_fin.exceptions import ParseError
+        from analyze_fin.parsers.gcash import GCashParser
 
         parser = GCashParser()
 

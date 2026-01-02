@@ -5,7 +5,6 @@ Story 3.1 AC: Detect exact and potential duplicate transactions.
 RED phase - these tests will fail until detector.py is implemented.
 """
 
-import pytest
 from datetime import datetime, timedelta
 from decimal import Decimal
 

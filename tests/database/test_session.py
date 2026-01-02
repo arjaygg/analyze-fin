@@ -9,10 +9,9 @@ Tests for database/session.py functions:
 Priority: P0 (Critical infrastructure)
 """
 
-import pytest
-from pathlib import Path
-from decimal import Decimal
 from datetime import datetime
+from decimal import Decimal
+from pathlib import Path
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -103,7 +102,7 @@ class TestGetEngine:
         WHEN get_engine is called
         THEN uses DEFAULT_DB_PATH.
         """
-        from analyze_fin.database.session import get_engine, DEFAULT_DB_PATH
+        from analyze_fin.database.session import DEFAULT_DB_PATH, get_engine
 
         engine = get_engine(None)
 
@@ -141,8 +140,8 @@ class TestGetSession:
         WHEN session block completes without exception
         THEN changes are committed to database.
         """
-        from analyze_fin.database.session import get_engine, get_session, init_db
         from analyze_fin.database.models import Account
+        from analyze_fin.database.session import get_session, init_db
 
         db_path = str(tmp_path / "test.db")
         engine = init_db(db_path)
@@ -164,8 +163,8 @@ class TestGetSession:
         WHEN an exception occurs in session block
         THEN changes are rolled back.
         """
-        from analyze_fin.database.session import get_engine, get_session, init_db
         from analyze_fin.database.models import Account
+        from analyze_fin.database.session import get_session, init_db
 
         db_path = str(tmp_path / "test.db")
         engine = init_db(db_path)
@@ -190,8 +189,8 @@ class TestGetSession:
         WHEN session block completes
         THEN session is closed properly.
         """
+
         from analyze_fin.database.session import get_engine, get_session
-        from sqlalchemy.exc import InvalidRequestError
 
         db_path = str(tmp_path / "test.db")
         engine = get_engine(db_path)
@@ -285,8 +284,8 @@ class TestInitDb:
         WHEN init_db is called
         THEN existing data is preserved.
         """
-        from analyze_fin.database.session import init_db, get_session
         from analyze_fin.database.models import Account
+        from analyze_fin.database.session import get_session, init_db
 
         db_path = str(tmp_path / "test.db")
 
@@ -313,8 +312,8 @@ class TestSessionIntegration:
         WHEN creating account, statement, and transaction
         THEN all entities are persisted with relationships.
         """
-        from analyze_fin.database.session import init_db, get_session
         from analyze_fin.database.models import Account, Statement, Transaction
+        from analyze_fin.database.session import get_session, init_db
 
         db_path = str(tmp_path / "test.db")
         engine = init_db(db_path)

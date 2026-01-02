@@ -5,11 +5,12 @@ All application-specific exceptions inherit from AnalyzeFinError,
 allowing CLI layer to catch-all with a single handler.
 
 Hierarchy:
-    AnalyzeFinError          # Base - catch-all for CLI
-    ├── ParseError           # PDF parsing failures
-    ├── ValidationError      # Data validation failures
-    ├── DuplicateError       # Duplicate transaction detected
-    └── ConfigError          # Configuration errors
+    AnalyzeFinError              # Base - catch-all for CLI
+    ├── ParseError               # PDF parsing failures
+    ├── ValidationError          # Data validation failures
+    ├── DuplicateError           # Duplicate transaction detected
+    ├── ConfigError              # Configuration errors
+    └── ReportGenerationError    # Report generation failures
 """
 
 
@@ -106,3 +107,25 @@ class ConfigError(AnalyzeFinError):
     ) -> None:
         super().__init__(message)
         self.setting = setting
+
+
+class ReportGenerationError(AnalyzeFinError):
+    """Report generation failures.
+
+    Raised when:
+    - Template file is missing or invalid
+    - Template rendering fails
+    - Output file cannot be written
+    - Invalid report format specified
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        template: str | None = None,
+        format: str | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.template = template
+        self.format = format

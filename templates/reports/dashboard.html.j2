@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} - Spending Report</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        :root {
+            --primary: #FF6B35;
+            --primary-dark: #e55a28;
+            --secondary: #1E90FF;
+            --success: #2E8B57;
+            --warning: #DAA520;
+            --danger: #DC143C;
+            --gray-100: #f8f9fa;
+            --gray-200: #e9ecef;
+            --gray-300: #dee2e6;
+            --gray-600: #6c757d;
+            --gray-800: #343a40;
+            --white: #ffffff;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, var(--gray-100) 0%, var(--gray-200) 100%);
+            min-height: 100vh;
+            color: var(--gray-800);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: var(--white);
+            padding: 2rem;
+            border-radius: 1rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        header .date-range {
+            opacity: 0.9;
+            font-size: 1rem;
+        }
+
+        header .generated {
+            opacity: 0.7;
+            font-size: 0.875rem;
+            margin-top: 0.5rem;
+        }
+
+        .warning-banner {
+            background: linear-gradient(135deg, #fff3cd 0%, #ffeeba 100%);
+            border-left: 4px solid var(--warning);
+            padding: 1rem 1.5rem;
+            border-radius: 0.5rem;
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .warning-banner .icon {
+            font-size: 1.5rem;
+        }
+
+        .warning-banner .message {
+            color: #856404;
+        }
+
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            background: var(--white);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .card .label {
+            color: var(--gray-600);
+            font-size: 0.875rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+
+        .card .value {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--gray-800);
+        }
+
+        .card .value.primary {
+            color: var(--primary);
+        }
+
+        .card .value.secondary {
+            color: var(--secondary);
+        }
+
+        .card .value.success {
+            color: var(--success);
+        }
+
+        section {
+            background: var(--white);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        section h2 {
+            color: var(--gray-800);
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 2px solid var(--gray-200);
+        }
+
+        .chart-container {
+            margin-bottom: 1.5rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+
+        th, td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        th {
+            background: var(--gray-100);
+            font-weight: 600;
+            color: var(--gray-600);
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.05em;
+        }
+
+        tr:hover {
+            background: var(--gray-100);
+        }
+
+        td.amount {
+            font-family: 'SF Mono', Monaco, Consolas, monospace;
+            font-weight: 500;
+        }
+
+        .percentage {
+            color: var(--gray-600);
+            font-size: 0.875rem;
+        }
+
+        .notes {
+            background: var(--gray-100);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-top: 1rem;
+            font-style: italic;
+            color: var(--gray-600);
+        }
+
+        footer {
+            text-align: center;
+            color: var(--gray-600);
+            font-size: 0.875rem;
+            padding: 2rem;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            header {
+                padding: 1.5rem;
+            }
+
+            header h1 {
+                font-size: 1.5rem;
+            }
+
+            .summary-cards {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .card .value {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>{{ title }}</h1>
+            {% if start_date and end_date %}
+            <div class="date-range">
+                {{ start_date|date_display }} - {{ end_date|date_display }}
+            </div>
+            {% endif %}
+            <div class="generated">
+                Generated on {{ generated_at|date_display }}
+            </div>
+        </header>
+
+        {% if has_limited_data %}
+        <div class="warning-banner">
+            <span class="icon">⚠️</span>
+            <span class="message">
+                <strong>Limited data available</strong> - You have fewer than 10 transactions. 
+                Insights may not be representative of your typical spending patterns.
+            </span>
+        </div>
+        {% endif %}
+
+        <!-- Summary Statistics -->
+        <div class="summary-cards">
+            <div class="card">
+                <div class="label">Total Spending</div>
+                <div class="value primary">{{ total_spent_formatted }}</div>
+            </div>
+            <div class="card">
+                <div class="label">Transactions</div>
+                <div class="value secondary">{{ report.total_transactions }}</div>
+            </div>
+            <div class="card">
+                <div class="label">Average per Transaction</div>
+                <div class="value success">{{ average_formatted }}</div>
+            </div>
+            {% if report.by_month|length > 0 %}
+            <div class="card">
+                <div class="label">Months Covered</div>
+                <div class="value">{{ report.by_month|length }}</div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Category Breakdown Section -->
+        <section id="categories">
+            <h2>📊 Spending by Category</h2>
+            {% if charts.category_pie %}
+            <div class="chart-container">
+                {{ charts.category_pie|safe }}
+            </div>
+            {% endif %}
+            {% if categories_sorted %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Category</th>
+                        <th>Amount</th>
+                        <th>Transactions</th>
+                        <th>% of Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for category, data in categories_sorted %}
+                    <tr>
+                        <td>{{ category }}</td>
+                        <td class="amount">{{ data.total|currency }}</td>
+                        <td>{{ data.count }}</td>
+                        <td class="percentage">{{ "%.1f"|format(data.percentage) }}%</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p>No category data available.</p>
+            {% endif %}
+        </section>
+
+        <!-- Top Merchants Section -->
+        <section id="merchants">
+            <h2>🏪 Top Merchants</h2>
+            {% if charts.top_merchants %}
+            <div class="chart-container">
+                {{ charts.top_merchants|safe }}
+            </div>
+            {% endif %}
+            {% if merchants_sorted %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Merchant</th>
+                        <th>Amount</th>
+                        <th>Transactions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for merchant in merchants_sorted %}
+                    <tr>
+                        <td>{{ merchant.merchant }}</td>
+                        <td class="amount">{{ merchant.total|currency }}</td>
+                        <td>{{ merchant.count }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p>No merchant data available.</p>
+            {% endif %}
+        </section>
+
+        <!-- Spending Trends Section -->
+        <section id="trends">
+            <h2>📈 Spending Trends</h2>
+            {% if charts.spending_trend %}
+            <div class="chart-container">
+                {{ charts.spending_trend|safe }}
+            </div>
+            {% else %}
+            <p>Not enough data to show spending trends. Add more transactions to see your spending over time.</p>
+            {% endif %}
+        </section>
+
+        <!-- Category Comparison Section -->
+        {% if charts.category_bar %}
+        <section id="comparison">
+            <h2>📊 Category Comparison</h2>
+            <div class="chart-container">
+                {{ charts.category_bar|safe }}
+            </div>
+        </section>
+        {% endif %}
+
+        {% if notes %}
+        <section id="notes">
+            <h2>📝 Notes</h2>
+            <div class="notes">
+                {{ notes }}
+            </div>
+        </section>
+        {% endif %}
+
+        <footer>
+            <p>Generated by analyze-fin • Philippine Personal Finance Tracker</p>
+        </footer>
+    </div>
+</body>
+</html>
+

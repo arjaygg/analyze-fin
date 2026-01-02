@@ -10,11 +10,12 @@ BPI statement format:
 - Password-protected PDFs
 """
 
-import pytest
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 class TestBPIParserStructure:
@@ -28,8 +29,8 @@ class TestBPIParserStructure:
 
     def test_bpi_parser_inherits_from_base(self):
         """BPIParser inherits from BaseBankParser."""
-        from analyze_fin.parsers.bpi import BPIParser
         from analyze_fin.parsers.base import BaseBankParser
+        from analyze_fin.parsers.bpi import BPIParser
 
         assert issubclass(BPIParser, BaseBankParser)
 
@@ -130,8 +131,8 @@ class TestBPIPasswordHandling:
 
     def test_password_protected_pdf_without_password_raises_error(self):
         """Parsing password-protected PDF without password raises error."""
-        from analyze_fin.parsers.bpi import BPIParser
         from analyze_fin.exceptions import ParseError
+        from analyze_fin.parsers.bpi import BPIParser
 
         parser = BPIParser()
 
@@ -144,8 +145,8 @@ class TestBPIPasswordHandling:
 
     def test_password_protected_pdf_with_correct_password_succeeds(self):
         """Parsing with correct password succeeds."""
-        from analyze_fin.parsers.bpi import BPIParser
         from analyze_fin.parsers.base import ParseResult
+        from analyze_fin.parsers.bpi import BPIParser
 
         parser = BPIParser()
 
@@ -176,8 +177,8 @@ class TestBPIRowExtraction:
 
     def test_extract_transaction_from_row(self):
         """Extract transaction from a BPI table row."""
-        from analyze_fin.parsers.bpi import BPIParser
         from analyze_fin.parsers.base import RawTransaction
+        from analyze_fin.parsers.bpi import BPIParser
 
         parser = BPIParser()
 
@@ -210,8 +211,8 @@ class TestBPIParseMethod:
 
     def test_parse_returns_parse_result(self):
         """parse() returns ParseResult object."""
-        from analyze_fin.parsers.bpi import BPIParser
         from analyze_fin.parsers.base import ParseResult
+        from analyze_fin.parsers.bpi import BPIParser
 
         parser = BPIParser()
 
@@ -268,7 +269,6 @@ class TestBPISecurityRequirements:
     def test_password_not_stored_in_result(self):
         """Password is not stored in ParseResult."""
         from analyze_fin.parsers.bpi import BPIParser
-        from analyze_fin.parsers.base import ParseResult
 
         parser = BPIParser()
 

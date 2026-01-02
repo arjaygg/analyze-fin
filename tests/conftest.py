@@ -8,15 +8,13 @@ This module provides reusable fixtures for:
 - CLI testing
 """
 
-import os
 import tempfile
-from pathlib import Path
-from typing import Generator
-from decimal import Decimal
+from collections.abc import Generator
 from datetime import datetime, timedelta
+from decimal import Decimal
+from pathlib import Path
 
-import pytest
-
+from tests.support.fixtures.files import *
 
 # ============================================================================
 # Database Fixtures

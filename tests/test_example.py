@@ -5,15 +5,15 @@ This file shows the recommended structure and patterns for writing tests
 in the analyze-fin project. Use this as a template for actual tests.
 """
 
-import pytest
-from decimal import Decimal
 from datetime import datetime
+from decimal import Decimal
+
+import pytest
 
 from tests.support.helpers import (
     assert_transaction_valid,
     generate_transaction,
 )
-
 
 # ============================================================================
 # Unit Tests (fast, isolated)

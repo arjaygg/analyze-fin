@@ -11,11 +11,14 @@ Supported banks:
 - Maya Wallet (maya_wallet)
 """
 
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -42,6 +45,7 @@ class ParseResult:
     transactions: list[RawTransaction]
     quality_score: float  # 0.0 to 1.0
     bank_type: str  # gcash, bpi, maya_savings, maya_wallet
+    file_path: Path | None = None  # Source file path for database persistence
 
     # Optional metadata
     opening_balance: Decimal | None = None
@@ -117,6 +121,7 @@ class BaseBankParser(ABC):
             with pdfplumber.open(pdf_path) as pdf:
                 # Read first page for identification
                 if not pdf.pages:
+                    logger.debug(f"No pages found in PDF: {pdf_path}")
                     return None
 
                 text = pdf.pages[0].extract_text() or ""
@@ -132,7 +137,9 @@ class BaseBankParser(ABC):
                         return "maya_savings"
                     return "maya_wallet"
 
+                logger.debug(f"Could not identify bank type from PDF content: {pdf_path}")
                 return None
 
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Error detecting bank type for {pdf_path}: {e}")
             return None

@@ -59,13 +59,22 @@ class BPIParser(BaseBankParser):
             ParseResult with transactions, quality score, and metadata
 
         Raises:
-            ParseError: If PDF cannot be parsed or password is incorrect
+            ParseError: If PDF cannot be parsed, password is incorrect, or file doesn't exist
         """
+        # Validate file exists
+        if not pdf_path.exists():
+            raise ParseError(
+                f"File not found: {pdf_path}",
+                file_path=str(pdf_path),
+                reason="File does not exist",
+            )
+
         transactions: list[RawTransaction] = []
         parsing_errors: list[str] = []
 
         try:
             with pdfplumber.open(pdf_path, password=password) as pdf:
+                # Try table extraction first (standard format)
                 for page_num, page in enumerate(pdf.pages, start=1):
                     tables = page.extract_tables() or []
 
@@ -90,6 +99,16 @@ class BPIParser(BaseBankParser):
                                 parsing_errors.append(
                                     f"Page {page_num}, row {row_idx}: {e}"
                                 )
+
+                # If no transactions found or quality too low, try text-based parsing (Savings Account format)
+                if len(transactions) == 0 or (transactions and all(tx.confidence < 0.5 for tx in transactions)):
+                    transactions = []
+                    parsing_errors = []
+                    for page_num, page in enumerate(pdf.pages, start=1):
+                        text = page.extract_text() or ""
+                        page_txs, page_errors = self._parse_text_format(text, page_num)
+                        transactions.extend(page_txs)
+                        parsing_errors.extend(page_errors)
 
         except Exception as e:
             error_msg = str(e).lower()
@@ -161,6 +180,108 @@ class BPIParser(BaseBankParser):
             reference_number=None,  # BPI doesn't typically show ref# in statements
             confidence=max(0.0, confidence),
         )
+
+    def _parse_text_format(self, text: str, page_num: int) -> tuple[list[RawTransaction], list[str]]:
+        """Parse BPI Savings Account text format (MMM DD date style).
+
+        This handles BPI statements where dates are "MMM DD" (e.g., "Sep 29", "Oct 02")
+        and transactions are line-by-line text rather than table format.
+
+        Args:
+            text: Raw text from PDF page
+            page_num: Page number for error reporting
+
+        Returns:
+            Tuple of (transactions list, errors list)
+        """
+        transactions: list[RawTransaction] = []
+        errors: list[str] = []
+
+        # Extract year from "PERIOD COVERED" line
+        year_match = re.search(r'PERIOD COVERED.*?(\d{4})', text)
+        year = int(year_match.group(1)) if year_match else datetime.now().year
+
+        # Pattern for transaction lines: "MMM DD Description [REF] [DETAILS] Amount(s) Balance"
+        # Amount can be in DEBIT or CREDIT column (before balance)
+        lines = text.split('\n')
+
+        for line_num, line in enumerate(lines, start=1):
+            # Match lines starting with month abbreviation + day
+            tx_pattern = r'^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2})\s+(.+)'
+            match = re.match(tx_pattern, line.strip())
+
+            if not match:
+                continue
+
+            month_abbr, day, rest = match.groups()
+
+            try:
+                # Parse date
+                date_str = f"{month_abbr} {day} {year}"
+                date = datetime.strptime(date_str, "%b %d %Y")
+
+                # Extract description and amounts from rest of line
+                # Pattern: Description [Numbers] [Numbers] Balance
+                # Need to find the last number (balance) and work backwards
+
+                # Split by whitespace and find numeric values
+                parts = rest.split()
+                numbers = []
+                desc_parts = []
+
+                for part in parts:
+                    # Check if this looks like a number (with comma separators)
+                    if re.match(r'^\d{1,3}(,\d{3})*(\.\d{2})?$', part):
+                        numbers.append(part)
+                    elif not numbers:  # Before we find numbers, it's description
+                        desc_parts.append(part)
+
+                if len(numbers) < 2:  # Need at least amount + balance
+                    continue
+
+                description = ' '.join(desc_parts)
+                if not description:
+                    description = "Transaction"
+
+                # Last number is balance, second-to-last is the amount
+                balance_str = numbers[-1]
+                amount_str = numbers[-2]
+
+                # Parse amount
+                amount = self._parse_amount(amount_str)
+
+                # Determine if debit or credit by checking if there are 3+ numbers
+                # If 3 numbers: [debit, credit, balance] or [amount, amount, balance]
+                # We'll determine sign by comparing with balance direction
+                # For now, assume withdrawals are more common and mark as negative
+                # This is a heuristic - better would be to track balance changes
+
+                # Simple heuristic: If description contains transfer OUT keywords, it's debit
+                debit_keywords = ['transfer fee', 'payment', 'bills payment', 'tax withheld']
+                credit_keywords = ['from:', 'interest earned', 'cash in']
+
+                desc_lower = description.lower()
+                if any(kw in desc_lower for kw in debit_keywords):
+                    amount = -abs(amount)
+                elif any(kw in desc_lower for kw in credit_keywords):
+                    amount = abs(amount)
+                elif 'instapay transfer' in desc_lower and 'from:' not in desc_lower:
+                    amount = -abs(amount)  # Outgoing transfer
+                # If ambiguous, leave as-is (positive)
+
+                tx = RawTransaction(
+                    date=date,
+                    description=description[:200],  # Limit description length
+                    amount=amount,
+                    reference_number=None,
+                    confidence=0.9,  # High confidence for text parsing
+                )
+                transactions.append(tx)
+
+            except (ValueError, InvalidOperation) as e:
+                errors.append(f"Page {page_num}, line {line_num}: {e}")
+
+        return transactions, errors
 
     def _parse_date(self, date_str: str) -> datetime:
         """Parse BPI date format: 'MM/DD/YYYY'.

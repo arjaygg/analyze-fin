@@ -5,7 +5,6 @@ Story 4.1 AC: Analyze spending patterns and generate reports.
 RED phase - these tests will fail until spending.py is implemented.
 """
 
-import pytest
 from datetime import datetime
 from decimal import Decimal
 

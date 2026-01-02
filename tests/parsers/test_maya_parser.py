@@ -9,11 +9,12 @@ Maya statement format:
 - Date format varies: "YYYY-MM-DD" or "DD/MM/YYYY"
 """
 
-import pytest
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 class TestMayaParserStructure:
@@ -27,8 +28,8 @@ class TestMayaParserStructure:
 
     def test_maya_parser_inherits_from_base(self):
         """MayaParser inherits from BaseBankParser."""
-        from analyze_fin.parsers.maya import MayaParser
         from analyze_fin.parsers.base import BaseBankParser
+        from analyze_fin.parsers.maya import MayaParser
 
         assert issubclass(MayaParser, BaseBankParser)
 
@@ -181,8 +182,8 @@ class TestMayaRowExtraction:
 
     def test_extract_transaction_from_row(self):
         """Extract transaction from a Maya table row."""
-        from analyze_fin.parsers.maya import MayaParser
         from analyze_fin.parsers.base import RawTransaction
+        from analyze_fin.parsers.maya import MayaParser
 
         parser = MayaParser()
 
@@ -215,8 +216,8 @@ class TestMayaParseMethod:
 
     def test_parse_returns_parse_result(self):
         """parse() returns ParseResult object."""
-        from analyze_fin.parsers.maya import MayaParser
         from analyze_fin.parsers.base import ParseResult
+        from analyze_fin.parsers.maya import MayaParser
 
         parser = MayaParser()
 
@@ -242,8 +243,8 @@ class TestMayaParseMethod:
 
     def test_parse_handles_errors_gracefully(self):
         """parse() handles parsing errors gracefully."""
-        from analyze_fin.parsers.maya import MayaParser
         from analyze_fin.exceptions import ParseError
+        from analyze_fin.parsers.maya import MayaParser
 
         parser = MayaParser()
 

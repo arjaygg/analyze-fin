@@ -8,8 +8,8 @@ When categorization logic is implemented, use these patterns for testing:
 - Category suggestions
 """
 
+
 import pytest
-from decimal import Decimal
 
 
 @pytest.mark.categorization

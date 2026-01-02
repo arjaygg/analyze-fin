@@ -1,108 +1,106 @@
-"""
-Custom assertion helpers for test suite.
-
-Provides domain-specific assertions that make tests more readable
-and provide better error messages.
-"""
+"""Test assertion helpers for transaction validation."""
 
 from decimal import Decimal
-from typing import Any, Dict, List
+from typing import Any
 
 
-def assert_transaction_valid(transaction: Dict[str, Any]) -> None:
+def assert_model_matches(model_instance: Any, expected_data: dict[str, Any]) -> None:
     """
-    Assert that a transaction has all required fields and valid values.
-
+    Assert that a SQLAlchemy model instance matches expected data.
+    
     Args:
-        transaction: Transaction dictionary to validate
+        model_instance: The model object to check
+        expected_data: Dictionary of expected field values
+    """
+    for key, value in expected_data.items():
+        assert hasattr(model_instance, key), f"Model {model_instance} missing attribute {key}"
+        actual_value = getattr(model_instance, key)
+        
+        # Handle Decimal comparison
+        if isinstance(actual_value, Decimal) and not isinstance(value, Decimal):
+             if isinstance(value, (str, int, float)):
+                 value = Decimal(str(value))
+                 
+        assert actual_value == value, f"Field {key}: expected {value}, got {actual_value}"
 
-    Raises:
-        AssertionError: If transaction is invalid
+
+def assert_valid_iso_date(date_str: str) -> None:
+    """Assert that a string is a valid ISO date (YYYY-MM-DD)."""
+    from datetime import datetime
+    try:
+        datetime.strptime(date_str, "%Y-%m-%d")
+    except ValueError:
+        raise AssertionError(f"String '{date_str}' is not a valid ISO date (YYYY-MM-DD)")
+
+
+def assert_valid_currency(amount_str: str) -> None:
+    """Assert that a string is a valid currency amount."""
+    try:
+        float(amount_str)
+    except ValueError:
+        raise AssertionError(f"String '{amount_str}' is not a valid currency amount")
+
+
+def assert_transaction_valid(transaction: Any) -> None:
+    """Assert that a transaction has all required fields.
+    
+    Supports both dict and object with attributes.
     """
     required_fields = ["date", "description", "amount"]
-
     for field in required_fields:
-        assert field in transaction, f"Transaction missing required field: {field}"
-
-    assert isinstance(transaction["amount"], Decimal), \
-        f"Amount must be Decimal, got {type(transaction['amount'])}"
-
-    assert transaction["amount"] != 0, "Transaction amount cannot be zero"
-
-
-def assert_transactions_equal(actual: Dict, expected: Dict, ignore_fields: List[str] = None) -> None:
-    """
-    Assert two transactions are equal, optionally ignoring certain fields.
-
-    Args:
-        actual: Actual transaction
-        expected: Expected transaction
-        ignore_fields: List of field names to ignore in comparison
-    """
-    ignore_fields = ignore_fields or ["id", "created_at", "updated_at"]
-
-    actual_filtered = {k: v for k, v in actual.items() if k not in ignore_fields}
-    expected_filtered = {k: v for k, v in expected.items() if k not in ignore_fields}
-
-    assert actual_filtered == expected_filtered, \
-        f"Transactions don't match.\nActual: {actual_filtered}\nExpected: {expected_filtered}"
+        if isinstance(transaction, dict):
+            assert field in transaction, f"Transaction missing required field: {field}"
+            assert transaction[field] is not None, f"Transaction field {field} is None"
+        else:
+            assert hasattr(transaction, field), f"Transaction missing required field: {field}"
+            assert getattr(transaction, field) is not None, f"Transaction field {field} is None"
 
 
-def assert_currency_equal(actual: Decimal, expected: Decimal, tolerance: Decimal = Decimal("0.01")) -> None:
-    """
-    Assert two currency values are equal within tolerance.
+def assert_transactions_equal(tx_a: Any, tx_b: Any) -> None:
+    """Assert that two transactions have equal core fields."""
+    fields = ["date", "description", "amount"]
+    for field in fields:
+        val_a = getattr(tx_a, field, None)
+        val_b = getattr(tx_b, field, None)
+        assert val_a == val_b, f"Transactions differ on {field}: {val_a} != {val_b}"
 
-    Args:
-        actual: Actual amount
-        expected: Expected amount
-        tolerance: Maximum allowed difference (default: 0.01 or 1 centavo)
-    """
-    diff = abs(actual - expected)
-    assert diff <= tolerance, \
-        f"Currency amounts differ by {diff} (tolerance: {tolerance}). Actual: {actual}, Expected: {expected}"
+
+def assert_currency_equal(
+    actual: Decimal | float | str,
+    expected: Decimal | float | str,
+    precision: int = 2
+) -> None:
+    """Assert two currency amounts are equal to given precision."""
+    actual_dec = Decimal(str(actual)) if not isinstance(actual, Decimal) else actual
+    expected_dec = Decimal(str(expected)) if not isinstance(expected, Decimal) else expected
+    assert round(actual_dec, precision) == round(expected_dec, precision), \
+        f"Currency mismatch: {actual_dec} != {expected_dec}"
 
 
 def assert_quality_score_valid(score: float) -> None:
-    """
-    Assert quality score is valid (between 0 and 1).
-
-    Args:
-        score: Quality score to validate
-    """
-    assert 0.0 <= score <= 1.0, f"Quality score must be between 0 and 1, got {score}"
+    """Assert quality score is within valid range [0.0, 1.0]."""
+    assert 0.0 <= score <= 1.0, f"Quality score {score} not in range [0.0, 1.0]"
 
 
-def assert_no_duplicates(transactions: List[Dict], key_fields: List[str] = None) -> None:
-    """
-    Assert there are no duplicate transactions based on key fields.
-
+def assert_no_duplicates(transactions: list[Any], key_func: Any = None) -> None:
+    """Assert no duplicate transactions in list.
+    
     Args:
         transactions: List of transactions
-        key_fields: Fields to check for duplicates (default: date, amount, description)
+        key_func: Optional function to extract comparison key
     """
-    key_fields = key_fields or ["date", "amount", "description"]
-
+    if key_func is None:
+        key_func = lambda tx: (tx.date, tx.description, str(tx.amount))
+    
     seen = set()
-    duplicates = []
-
-    for txn in transactions:
-        key = tuple(txn.get(field) for field in key_fields)
-        if key in seen:
-            duplicates.append(txn)
+    for tx in transactions:
+        key = key_func(tx)
+        assert key not in seen, f"Duplicate transaction found: {key}"
         seen.add(key)
 
-    assert not duplicates, f"Found {len(duplicates)} duplicate transactions: {duplicates}"
 
-
-def assert_categorized(transaction: Dict) -> None:
-    """
-    Assert transaction has been categorized.
-
-    Args:
-        transaction: Transaction to check
-    """
-    assert "category" in transaction, "Transaction missing category field"
-    assert transaction["category"] is not None, "Transaction category is None"
-    assert transaction["category"] != "", "Transaction category is empty"
-    assert transaction["category"] != "Uncategorized", \
-        "Transaction should be categorized but is marked as Uncategorized"
+def assert_categorized(transaction: Any) -> None:
+    """Assert that a transaction has been categorized."""
+    category = getattr(transaction, "category", None)
+    assert category is not None, "Transaction is not categorized"
+    assert category != "Uncategorized", "Transaction is still Uncategorized"

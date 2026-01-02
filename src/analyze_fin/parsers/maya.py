@@ -7,6 +7,7 @@ Maya (formerly PayMaya) statement format:
 - Table columns typically: Date | Description | Amount | Balance
 """
 
+import logging
 import re
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
@@ -16,6 +17,8 @@ import pdfplumber
 
 from analyze_fin.exceptions import ParseError
 from analyze_fin.parsers.base import BaseBankParser, ParseResult, RawTransaction
+
+logger = logging.getLogger(__name__)
 
 
 class MayaParser(BaseBankParser):
@@ -56,8 +59,16 @@ class MayaParser(BaseBankParser):
             ParseResult with transactions, quality score, and metadata
 
         Raises:
-            ParseError: If PDF cannot be parsed
+            ParseError: If PDF cannot be parsed or file doesn't exist
         """
+        # Validate file exists
+        if not pdf_path.exists():
+            raise ParseError(
+                f"File not found: {pdf_path}",
+                file_path=str(pdf_path),
+                reason="File does not exist",
+            )
+
         transactions: list[RawTransaction] = []
         parsing_errors: list[str] = []
         bank_type = "maya_wallet"  # Default
@@ -99,7 +110,7 @@ class MayaParser(BaseBankParser):
                 f"Failed to parse Maya PDF: {e}",
                 file_path=str(pdf_path),
                 reason=str(e),
-            )
+            ) from e
 
         quality_score = self.calculate_quality_score(transactions)
 
@@ -174,9 +185,12 @@ class MayaParser(BaseBankParser):
         """Parse Maya date format.
 
         Handles multiple formats:
-        - 'YYYY-MM-DD' (ISO format)
-        - 'DD/MM/YYYY' (European format)
-        - 'MM/DD/YYYY' (US format)
+        - 'YYYY-MM-DD' (ISO format) - Unambiguous
+        - 'DD/MM/YYYY' (European format) - Detected when day > 12
+        - 'MM/DD/YYYY' (US format) - Default assumption
+
+        Note: Dates like "05/12/2024" are ambiguous and default to MM/DD/YYYY
+        (May 12, 2024). A warning is logged for ambiguous dates.
 
         Args:
             date_str: Date string
@@ -189,7 +203,7 @@ class MayaParser(BaseBankParser):
         """
         date_str = date_str.strip()
 
-        # Try ISO format: YYYY-MM-DD
+        # Try ISO format: YYYY-MM-DD (unambiguous)
         iso_pattern = r"(\d{4})-(\d{1,2})-(\d{1,2})"
         match = re.match(iso_pattern, date_str)
         if match:
@@ -205,13 +219,21 @@ class MayaParser(BaseBankParser):
             second_int = int(second)
             year_int = int(year)
 
-            # Heuristic: if first > 12, it's DD/MM/YYYY
-            # otherwise assume MM/DD/YYYY (common in Maya)
+            # Heuristic: if first > 12, it must be DD/MM/YYYY
             if first_int > 12:
-                # DD/MM/YYYY
+                # DD/MM/YYYY - unambiguous
                 return datetime(year_int, second_int, first_int)
+            elif second_int > 12:
+                # Second > 12 means first must be month (MM/DD/YYYY)
+                return datetime(year_int, first_int, second_int)
             else:
-                # MM/DD/YYYY
+                # Ambiguous: both values could be month or day
+                # Default to MM/DD/YYYY but log warning
+                logger.debug(
+                    f"Ambiguous date format '{date_str}': interpreting as MM/DD/YYYY "
+                    f"({first_int}/{second_int}/{year_int} = month {first_int}, day {second_int}). "
+                    f"If this is incorrect, dates may be wrong."
+                )
                 return datetime(year_int, first_int, second_int)
 
         raise ValueError(f"Invalid date format: {date_str}")
@@ -265,4 +287,4 @@ class MayaParser(BaseBankParser):
                 amount = -amount
             return amount
         except InvalidOperation as e:
-            raise ValueError(f"Cannot parse amount '{amount_str}': {e}")
+            raise ValueError(f"Cannot parse amount '{amount_str}': {e}") from e

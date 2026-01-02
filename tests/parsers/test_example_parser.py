@@ -7,10 +7,9 @@ When actual parsers are implemented, use these patterns for:
 - Maya parser (test_maya_parser.py)
 """
 
-import pytest
 from decimal import Decimal
-from datetime import datetime
-from pathlib import Path
+
+import pytest
 
 
 @pytest.mark.parser

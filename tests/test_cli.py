@@ -6,11 +6,9 @@ Tests for the analyze-fin CLI using Typer's CliRunner.
 Priority: P0 (Critical - user-facing interface)
 """
 
-import pytest
 from typer.testing import CliRunner
 
 from analyze_fin.cli import app
-
 
 # Create CLI runner for all tests
 runner = CliRunner()
@@ -93,14 +91,22 @@ class TestHelpCommand:
 class TestQueryCommand:
     """Test the query command."""
 
-    def test_query_command_exits_successfully(self):
+    def test_query_command_exits_successfully(self, tmp_path, monkeypatch):
         """
-        GIVEN the CLI app
+        GIVEN the CLI app with an empty database
         WHEN user runs `analyze-fin query`
-        THEN exit code is 0.
+        THEN exit code is 0 (no transactions found).
         """
+        # Use temp database to avoid pollution
+        db_path = tmp_path / "test.db"
+        monkeypatch.setenv("ANALYZE_FIN_DB", str(db_path))
+        # Patch the default db path
+        import analyze_fin.database.session
+        monkeypatch.setattr(analyze_fin.database.session, "DEFAULT_DB_PATH", str(db_path))
+
         result = runner.invoke(app, ["query"])
         assert result.exit_code == 0
+        assert "No transactions found" in result.stdout
 
     def test_query_help_shows_options(self):
         """
@@ -114,93 +120,134 @@ class TestQueryCommand:
         assert "--merchant" in result.stdout
         assert "--date-range" in result.stdout
 
-    def test_query_with_category_flag(self):
+    def test_query_with_category_flag(self, tmp_path, monkeypatch):
         """
         GIVEN the CLI app
         WHEN user runs `analyze-fin query --category "Food & Dining"`
         THEN command accepts the category filter.
         """
+        db_path = tmp_path / "test.db"
+        import analyze_fin.database.session
+        monkeypatch.setattr(analyze_fin.database.session, "DEFAULT_DB_PATH", str(db_path))
+
         result = runner.invoke(app, ["query", "--category", "Food & Dining"])
         assert result.exit_code == 0
-        assert "Food & Dining" in result.stdout
+        # No transactions, but command succeeds
+        assert "No transactions found" in result.stdout
 
-    def test_query_with_short_category_flag(self):
+    def test_query_with_short_category_flag(self, tmp_path, monkeypatch):
         """
         GIVEN the CLI app
         WHEN user runs `analyze-fin query -c "Shopping"`
         THEN command accepts the short flag.
         """
+        db_path = tmp_path / "test.db"
+        import analyze_fin.database.session
+        monkeypatch.setattr(analyze_fin.database.session, "DEFAULT_DB_PATH", str(db_path))
+
         result = runner.invoke(app, ["query", "-c", "Shopping"])
         assert result.exit_code == 0
-        assert "Shopping" in result.stdout
+        assert "No transactions found" in result.stdout
 
-    def test_query_with_merchant_flag(self):
+    def test_query_with_merchant_flag(self, tmp_path, monkeypatch):
         """
         GIVEN the CLI app
         WHEN user runs `analyze-fin query --merchant "Jollibee"`
         THEN command accepts the merchant filter.
         """
+        db_path = tmp_path / "test.db"
+        import analyze_fin.database.session
+        monkeypatch.setattr(analyze_fin.database.session, "DEFAULT_DB_PATH", str(db_path))
+
         result = runner.invoke(app, ["query", "--merchant", "Jollibee"])
         assert result.exit_code == 0
-        assert "Jollibee" in result.stdout
+        assert "No transactions found" in result.stdout
 
-    def test_query_with_short_merchant_flag(self):
+    def test_query_with_short_merchant_flag(self, tmp_path, monkeypatch):
         """
         GIVEN the CLI app
         WHEN user runs `analyze-fin query -m "Grab"`
         THEN command accepts the short flag.
         """
+        db_path = tmp_path / "test.db"
+        import analyze_fin.database.session
+        monkeypatch.setattr(analyze_fin.database.session, "DEFAULT_DB_PATH", str(db_path))
+
         result = runner.invoke(app, ["query", "-m", "Grab"])
         assert result.exit_code == 0
-        assert "Grab" in result.stdout
+        assert "No transactions found" in result.stdout
 
-    def test_query_with_date_range_flag(self):
+    def test_query_with_date_range_flag(self, tmp_path, monkeypatch):
         """
         GIVEN the CLI app
         WHEN user runs `analyze-fin query --date-range "November 2024"`
         THEN command accepts the date range filter.
         """
+        db_path = tmp_path / "test.db"
+        import analyze_fin.database.session
+        monkeypatch.setattr(analyze_fin.database.session, "DEFAULT_DB_PATH", str(db_path))
+
         result = runner.invoke(app, ["query", "--date-range", "November 2024"])
         assert result.exit_code == 0
-        assert "November 2024" in result.stdout
+        assert "No transactions found" in result.stdout
 
-    def test_query_with_amount_min_flag(self):
+    def test_query_with_amount_min_flag(self, tmp_path, monkeypatch):
         """
         GIVEN the CLI app
         WHEN user runs `analyze-fin query --amount-min 500`
         THEN command accepts the minimum amount filter.
         """
+        db_path = tmp_path / "test.db"
+        import analyze_fin.database.session
+        monkeypatch.setattr(analyze_fin.database.session, "DEFAULT_DB_PATH", str(db_path))
+
         result = runner.invoke(app, ["query", "--amount-min", "500"])
         assert result.exit_code == 0
-        # Output should show the minimum amount with peso formatting
-        assert "500" in result.stdout
+        assert "No transactions found" in result.stdout
 
-    def test_query_with_amount_max_flag(self):
+    def test_query_with_amount_max_flag(self, tmp_path, monkeypatch):
         """
         GIVEN the CLI app
         WHEN user runs `analyze-fin query --amount-max 1000`
         THEN command accepts the maximum amount filter.
         """
+        db_path = tmp_path / "test.db"
+        import analyze_fin.database.session
+        monkeypatch.setattr(analyze_fin.database.session, "DEFAULT_DB_PATH", str(db_path))
+
         result = runner.invoke(app, ["query", "--amount-max", "1000"])
         assert result.exit_code == 0
-        assert "1,000" in result.stdout or "1000" in result.stdout
+        assert "No transactions found" in result.stdout
 
-    def test_query_with_format_flag(self):
+    def test_query_with_format_flag_json(self, tmp_path, monkeypatch):
         """
         GIVEN the CLI app
         WHEN user runs `analyze-fin query --format json`
-        THEN command accepts the format option.
+        THEN command outputs JSON format.
         """
+        db_path = tmp_path / "test.db"
+        import analyze_fin.database.session
+        monkeypatch.setattr(analyze_fin.database.session, "DEFAULT_DB_PATH", str(db_path))
+
         result = runner.invoke(app, ["query", "--format", "json"])
         assert result.exit_code == 0
-        assert "json" in result.stdout
+        # JSON output should be valid JSON with count and transactions
+        import json
+        output = json.loads(result.stdout)
+        assert "count" in output
+        assert "transactions" in output
+        assert output["count"] == 0
 
-    def test_query_with_multiple_filters(self):
+    def test_query_with_multiple_filters(self, tmp_path, monkeypatch):
         """
         GIVEN the CLI app
         WHEN user runs query with multiple filters
         THEN all filters are accepted.
         """
+        db_path = tmp_path / "test.db"
+        import analyze_fin.database.session
+        monkeypatch.setattr(analyze_fin.database.session, "DEFAULT_DB_PATH", str(db_path))
+
         result = runner.invoke(
             app,
             [
@@ -214,8 +261,7 @@ class TestQueryCommand:
             ],
         )
         assert result.exit_code == 0
-        assert "Food & Dining" in result.stdout
-        assert "Jollibee" in result.stdout
+        assert "No transactions found" in result.stdout
 
 
 class TestNoArgsShowsHelp:
@@ -250,9 +296,247 @@ class TestCommandValidation:
         """
         GIVEN the CLI app
         WHEN user provides invalid format option
-        THEN command still runs (format is just a string option).
+        THEN command returns exit code 2 (usage error).
         """
-        # The current implementation accepts any string for format
-        # This tests that it doesn't crash
         result = runner.invoke(app, ["query", "--format", "invalid"])
+        assert result.exit_code == 2
+        assert "Invalid format" in result.stdout
+
+    def test_query_rejects_invalid_amount_min(self):
+        """
+        GIVEN the CLI app
+        WHEN user provides non-numeric amount-min
+        THEN command returns exit code 2.
+        """
+        result = runner.invoke(app, ["query", "--amount-min", "abc"])
+        assert result.exit_code == 2
+        assert "Invalid amount-min" in result.stdout
+
+    def test_query_rejects_invalid_date_range(self):
+        """
+        GIVEN the CLI app
+        WHEN user provides invalid date range format
+        THEN command returns exit code 2.
+        """
+        result = runner.invoke(app, ["query", "--date-range", "invalid-date"])
+        assert result.exit_code == 2
+        assert "Unrecognized date range" in result.stdout
+
+
+# ============================================================================
+# Test: Report Command
+# ============================================================================
+
+
+class TestReportCommand:
+    """Test the report command."""
+
+    def test_report_help_shows_options(self):
+        """
+        GIVEN the CLI app
+        WHEN user runs `analyze-fin report --help`
+        THEN help shows available options.
+        """
+        result = runner.invoke(app, ["report", "--help"])
         assert result.exit_code == 0
+        assert "--format" in result.stdout or "--output" in result.stdout
+
+    def test_report_with_empty_database(self, tmp_path, monkeypatch):
+        """
+        GIVEN empty database
+        WHEN user runs `analyze-fin report`
+        THEN helpful message is shown.
+        """
+        db_path = tmp_path / "test.db"
+        import analyze_fin.database.session
+        monkeypatch.setattr(analyze_fin.database.session, "DEFAULT_DB_PATH", str(db_path))
+
+        result = runner.invoke(app, ["report"])
+        # Should succeed but note no transactions
+        assert result.exit_code == 0
+        assert "No transactions" in result.stdout or "report" in result.stdout.lower()
+
+
+# ============================================================================
+# Test: Export Command
+# ============================================================================
+
+
+class TestExportCommand:
+    """Test the export command."""
+
+    def test_export_help_shows_options(self):
+        """
+        GIVEN the CLI app
+        WHEN user runs `analyze-fin export --help`
+        THEN help shows available options.
+        """
+        result = runner.invoke(app, ["export", "--help"])
+        assert result.exit_code == 0
+        assert "--format" in result.stdout
+
+    def test_export_csv_format(self, tmp_path, monkeypatch):
+        """
+        GIVEN the CLI app
+        WHEN user runs `analyze-fin export --format csv`
+        THEN CSV output is generated.
+        """
+        db_path = tmp_path / "test.db"
+        import analyze_fin.database.session
+        monkeypatch.setattr(analyze_fin.database.session, "DEFAULT_DB_PATH", str(db_path))
+
+        result = runner.invoke(app, ["export", "--format", "csv"])
+        assert result.exit_code == 0
+        # Should have CSV header
+        assert "date" in result.stdout or "No transactions" in result.stdout
+
+    def test_export_json_format(self, tmp_path, monkeypatch):
+        """
+        GIVEN the CLI app
+        WHEN user runs `analyze-fin export --format json`
+        THEN JSON output is generated.
+        """
+        db_path = tmp_path / "test.db"
+        import analyze_fin.database.session
+        monkeypatch.setattr(analyze_fin.database.session, "DEFAULT_DB_PATH", str(db_path))
+
+        result = runner.invoke(app, ["export", "--format", "json"])
+        assert result.exit_code == 0
+        # Should be valid JSON
+        import json
+        data = json.loads(result.stdout)
+        assert "transactions" in data
+
+
+# ============================================================================
+# Test: Categorize Command
+# ============================================================================
+
+
+class TestCategorizeCommand:
+    """Test the categorize command."""
+
+    def test_categorize_help_shows_options(self):
+        """
+        GIVEN the CLI app
+        WHEN user runs `analyze-fin categorize --help`
+        THEN help shows available options.
+        """
+        result = runner.invoke(app, ["categorize", "--help"])
+        assert result.exit_code == 0
+
+    def test_categorize_with_empty_database(self, tmp_path, monkeypatch):
+        """
+        GIVEN empty database
+        WHEN user runs `analyze-fin categorize`
+        THEN helpful message is shown.
+        """
+        db_path = tmp_path / "test.db"
+        import analyze_fin.database.session
+        monkeypatch.setattr(analyze_fin.database.session, "DEFAULT_DB_PATH", str(db_path))
+
+        result = runner.invoke(app, ["categorize"])
+        assert result.exit_code == 0
+        assert "No" in result.stdout or "categoriz" in result.stdout.lower()
+
+
+# ============================================================================
+# Test: Deduplicate Command
+# ============================================================================
+
+
+class TestDeduplicateCommand:
+    """Test the deduplicate command."""
+
+    def test_deduplicate_help_shows_options(self):
+        """
+        GIVEN the CLI app
+        WHEN user runs `analyze-fin deduplicate --help`
+        THEN help shows available options.
+        """
+        result = runner.invoke(app, ["deduplicate", "--help"])
+        assert result.exit_code == 0
+
+    def test_deduplicate_with_empty_database(self, tmp_path, monkeypatch):
+        """
+        GIVEN empty database
+        WHEN user runs `analyze-fin deduplicate`
+        THEN helpful message is shown.
+        """
+        db_path = tmp_path / "test.db"
+        import analyze_fin.database.session
+        monkeypatch.setattr(analyze_fin.database.session, "DEFAULT_DB_PATH", str(db_path))
+
+        result = runner.invoke(app, ["deduplicate"])
+        assert result.exit_code == 0
+        assert "No" in result.stdout or "duplicat" in result.stdout.lower()
+
+
+# ============================================================================
+# Test: Ask Command (Natural Language)
+# ============================================================================
+
+
+class TestAskCommand:
+    """Test the ask command (natural language queries)."""
+
+    def test_ask_help_shows_options(self):
+        """
+        GIVEN the CLI app
+        WHEN user runs `analyze-fin ask --help`
+        THEN help shows available options.
+        """
+        result = runner.invoke(app, ["ask", "--help"])
+        assert result.exit_code == 0
+        assert "natural language" in result.stdout.lower() or "question" in result.stdout.lower()
+
+    def test_ask_parses_category_query(self, tmp_path, monkeypatch):
+        """
+        GIVEN the CLI app
+        WHEN user asks about food spending
+        THEN category is parsed correctly.
+        """
+        db_path = tmp_path / "test.db"
+        import analyze_fin.database.session
+        monkeypatch.setattr(analyze_fin.database.session, "DEFAULT_DB_PATH", str(db_path))
+
+        result = runner.invoke(app, ["ask", "How much did I spend on food?"])
+        assert result.exit_code == 0
+        assert "Food & Dining" in result.stdout
+
+    def test_ask_parses_total_intent(self, tmp_path, monkeypatch):
+        """
+        GIVEN the CLI app
+        WHEN user asks "how much"
+        THEN total intent is detected.
+        """
+        db_path = tmp_path / "test.db"
+        import analyze_fin.database.session
+        monkeypatch.setattr(analyze_fin.database.session, "DEFAULT_DB_PATH", str(db_path))
+
+        result = runner.invoke(app, ["ask", "How much did I spend?"])
+        assert result.exit_code == 0
+        assert "total" in result.stdout.lower()
+
+    def test_ask_parses_date_range(self, tmp_path, monkeypatch):
+        """
+        GIVEN the CLI app
+        WHEN user asks about last month
+        THEN date range is parsed.
+        """
+        db_path = tmp_path / "test.db"
+        import analyze_fin.database.session
+        monkeypatch.setattr(analyze_fin.database.session, "DEFAULT_DB_PATH", str(db_path))
+
+        result = runner.invoke(app, ["ask", "Show transactions last month"])
+        assert result.exit_code == 0
+        assert "From:" in result.stdout
+
+    def test_ask_requires_question(self):
+        """
+        GIVEN the CLI app
+        WHEN user runs ask without question
+        THEN error is shown.
+        """
+        result = runner.invoke(app, ["ask"])
+        assert result.exit_code != 0

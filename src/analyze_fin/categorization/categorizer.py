@@ -7,14 +7,13 @@ Provides:
 - Methods: merchant_mapping, keyword matching, pattern matching
 """
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Sequence, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from analyze_fin.categorization.taxonomy import (
     CATEGORIES,
     MERCHANT_MAPPING,
-    get_category,
-    get_normalized_name,
 )
 from analyze_fin.parsers.base import RawTransaction
 

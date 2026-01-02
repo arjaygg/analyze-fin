@@ -7,8 +7,8 @@ Provides:
 - Exact, partial, and fuzzy matching support
 """
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Sequence
 
 from analyze_fin.categorization.taxonomy import MERCHANT_MAPPING
 

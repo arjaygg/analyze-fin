@@ -8,10 +8,11 @@ Provides:
 """
 
 from collections import defaultdict
-from dataclasses import dataclass, field
+from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Sequence
+from typing import Any
 
 
 @dataclass
