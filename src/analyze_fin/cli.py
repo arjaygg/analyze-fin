@@ -482,6 +482,11 @@ def report(
         "-d",
         help="Filter by date range (e.g., 'November 2024')"
     ),
+    no_open: bool = typer.Option(
+        False,
+        "--no-open",
+        help="Don't automatically open HTML reports in browser"
+    ),
 ) -> None:
     """
     Generate spending report from transactions.
@@ -569,8 +574,15 @@ def report(
                     )
 
                 if output_path:
-                    Path(output_path).write_text(content, encoding="utf-8")
+                    output_file = Path(output_path)
+                    output_file.write_text(content, encoding="utf-8")
                     console.print(f"[green]✓[/green] Report saved to {output_path}")
+
+                    # Auto-open HTML reports in browser unless --no-open flag is set
+                    if output_format == "html" and not no_open:
+                        import webbrowser
+                        webbrowser.open(output_file.resolve().as_uri())
+                        console.print("[dim]Opened report in browser[/dim]")
                 else:
                     console.print(content)
             else:
@@ -670,13 +682,10 @@ def export(
         # Export filtered transactions
         analyze-fin export --category "Food & Dining" --format csv
     """
-    import csv
-    import sys
     from pathlib import Path
 
     from sqlalchemy.orm import Session
 
-    from analyze_fin.database.models import Transaction
     from analyze_fin.database.session import init_db
     from analyze_fin.queries.spending import SpendingQuery
 

@@ -21,6 +21,13 @@ if TYPE_CHECKING:
 # Minimum data points required to generate meaningful charts
 MIN_DATA_POINTS = 1
 
+# Color constants for period comparison annotations
+COLOR_SPENDING_INCREASE = "#DC143C"  # Crimson red - spending increased (negative outcome)
+COLOR_SPENDING_DECREASE = "#2E8B57"  # Sea green - spending decreased (positive outcome)
+
+# Maximum slices/bars before grouping into "Others"
+MAX_CHART_ITEMS = 10
+
 
 def _has_sufficient_data(data: dict | list) -> bool:
     """Check if data has at least MIN_DATA_POINTS entries.
@@ -106,18 +113,22 @@ class ChartBuilder:
         self,
         by_category: dict[str, dict[str, Any]],
         title: str = "Spending by Category",
+        max_slices: int | None = None,
     ) -> go.Figure | None:
         """Create a pie chart showing spending distribution by category.
 
         Generates an interactive pie chart with hover details showing category
         name, amount in Philippine Peso, and percentage of total spending.
         Categories are sorted by amount descending so the largest slice appears
-        first.
+        first. If there are more categories than max_slices, smaller categories
+        are grouped into "Others".
 
         Args:
             by_category: Dictionary from SpendingReport.by_category with format:
                 {"Category Name": {"total": Decimal, "count": int, "percentage": float}}
             title: Chart title. Defaults to "Spending by Category".
+            max_slices: Maximum number of pie slices (including "Others").
+                Defaults to MAX_CHART_ITEMS. Set to None for no limit.
 
         Returns:
             Plotly Figure object, or None if by_category is empty.
@@ -130,6 +141,9 @@ class ChartBuilder:
         if not _has_sufficient_data(by_category):
             return None
 
+        # Use default max_slices if not specified
+        effective_max = max_slices if max_slices is not None else MAX_CHART_ITEMS
+
         # Sort categories by total amount descending (largest first)
         sorted_categories = sorted(
             by_category.items(),
@@ -137,8 +151,16 @@ class ChartBuilder:
             reverse=True,
         )
 
-        categories = [cat for cat, _ in sorted_categories]
-        values = [float(data["total"]) for _, data in sorted_categories]
+        # Group smaller categories into "Others" if needed
+        if len(sorted_categories) > effective_max:
+            top_categories = sorted_categories[: effective_max - 1]
+            others = sorted_categories[effective_max - 1 :]
+            others_total = sum(float(data["total"]) for _, data in others)
+            categories = [cat for cat, _ in top_categories] + ["Others"]
+            values = [float(data["total"]) for _, data in top_categories] + [others_total]
+        else:
+            categories = [cat for cat, _ in sorted_categories]
+            values = [float(data["total"]) for _, data in sorted_categories]
 
         # Create pie chart using graph_objects for more control
         fig = go.Figure(
@@ -235,17 +257,21 @@ class ChartBuilder:
         self,
         by_category: dict[str, dict[str, Any]],
         title: str = "Category Spending Comparison",
+        max_bars: int | None = None,
     ) -> go.Figure | None:
         """Create a bar chart comparing spending across categories.
 
         Generates an interactive bar chart with hover details showing category
         name, amount in Philippine Peso, and transaction count. Categories are
-        sorted by amount descending (highest spending first).
+        sorted by amount descending (highest spending first). If there are more
+        categories than max_bars, smaller categories are grouped into "Others".
 
         Args:
             by_category: Dictionary from SpendingReport.by_category with format:
                 {"Category Name": {"total": Decimal, "count": int, "percentage": float}}
             title: Chart title. Defaults to "Category Spending Comparison".
+            max_bars: Maximum number of bars (including "Others").
+                Defaults to MAX_CHART_ITEMS. Set to None for no limit.
 
         Returns:
             Plotly Figure object, or None if by_category is empty.
@@ -258,6 +284,9 @@ class ChartBuilder:
         if not _has_sufficient_data(by_category):
             return None
 
+        # Use default max_bars if not specified
+        effective_max = max_bars if max_bars is not None else MAX_CHART_ITEMS
+
         # Sort categories by total amount descending
         sorted_categories = sorted(
             by_category.items(),
@@ -265,9 +294,19 @@ class ChartBuilder:
             reverse=True,
         )
 
-        categories = [cat for cat, _ in sorted_categories]
-        values = [float(data["total"]) for _, data in sorted_categories]
-        counts = [data["count"] for _, data in sorted_categories]
+        # Group smaller categories into "Others" if needed
+        if len(sorted_categories) > effective_max:
+            top_categories = sorted_categories[: effective_max - 1]
+            others = sorted_categories[effective_max - 1 :]
+            others_total = sum(float(data["total"]) for _, data in others)
+            others_count = sum(data["count"] for _, data in others)
+            categories = [cat for cat, _ in top_categories] + ["Others"]
+            values = [float(data["total"]) for _, data in top_categories] + [others_total]
+            counts = [data["count"] for _, data in top_categories] + [others_count]
+        else:
+            categories = [cat for cat, _ in sorted_categories]
+            values = [float(data["total"]) for _, data in sorted_categories]
+            counts = [data["count"] for _, data in sorted_categories]
 
         # Create bar chart
         fig = go.Figure(
@@ -371,10 +410,10 @@ class ChartBuilder:
         # Build change annotation
         if change_percent >= 0:
             change_text = f"↑ +{change_percent:.1f}%"
-            change_color = "#DC143C"  # Red for increase (spending more)
+            change_color = COLOR_SPENDING_INCREASE  # Red for increase (spending more)
         else:
             change_text = f"↓ {change_percent:.1f}%"
-            change_color = "#2E8B57"  # Green for decrease (spending less)
+            change_color = COLOR_SPENDING_DECREASE  # Green for decrease (spending less)
 
         fig.update_layout(
             title={"text": title},

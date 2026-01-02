@@ -11,6 +11,7 @@ Example:
     generator.save_report(html, Path("report.html"))
 """
 
+import logging
 from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -20,6 +21,8 @@ from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 
 from analyze_fin.exceptions import ReportGenerationError
 from analyze_fin.reports.charts import ChartBuilder
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from analyze_fin.analysis.spending import SpendingReport
@@ -178,6 +181,13 @@ class ReportGenerator:
 
         # Generate charts
         charts = self.chart_builder.generate_all_charts(report)
+
+        # Warn if all charts are empty (insufficient data for visualization)
+        if all(not chart_html for chart_html in charts.values()):
+            logger.warning(
+                "All charts are empty - insufficient data for visualization. "
+                "Consider importing more transactions before generating reports."
+            )
 
         # Check for limited data
         has_limited_data = report.total_transactions < MIN_TRANSACTIONS_FOR_INSIGHTS
