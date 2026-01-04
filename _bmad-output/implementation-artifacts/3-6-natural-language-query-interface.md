@@ -1,6 +1,6 @@
 # Story 3.6: Natural Language Query Interface
 
-Status: review
+Status: done
 
 ## Story
 

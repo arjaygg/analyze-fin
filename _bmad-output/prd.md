@@ -617,6 +617,19 @@ analyze-fin query-spending --category Food --format json | jq '.transactions[] |
 - **FR12:** User can associate transactions with specific accounts (GCash, BPI, Maya, etc.)
 - **FR13:** System can maintain referential integrity across accounts, statements, and transactions
 
+### Account Identification & Multi-Account Support (Added 2026-01-04)
+
+- **FR49:** System shall extract unique account identifiers (account number, masked) from bank statement PDFs during parsing
+- **FR50:** System shall extract account holder name from bank statement PDFs when available
+- **FR51:** System shall extract statement period (start/end dates) from bank statement PDFs
+- **FR52:** System shall support multiple accounts of the same bank type (e.g., two GCash accounts, personal and business BPI accounts)
+- **FR53:** System shall use composite key (bank_type + account_number) to uniquely identify accounts, preventing account merging
+- **FR54:** All downstream skills (reports, queries, exports, categorization, deduplication) shall display and respect account context via database relationships
+- **FR55:** Reports shall display account source information in headers (account name, bank type, account number masked)
+- **FR56:** Query results shall include account attribution for each transaction
+- **FR57:** Duplicate detection shall scope to same account by default, with optional cross-account mode
+- **FR58:** User can filter queries and reports by specific account(s)
+
 ### Categorization & Merchant Intelligence
 
 - **FR14:** System can automatically categorize transactions based on merchant name

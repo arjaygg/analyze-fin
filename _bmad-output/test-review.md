@@ -1,242 +1,293 @@
-# Test Quality Review
+# Test Quality Review: analyze-fin (pytest suite)
 
-**Date:** 2025-12-23
-**Scope:** New tests from `*automate` workflow
-**Files Reviewed:**
-- `tests/database/test_session.py` (16 tests, 350 lines)
-- `tests/test_cli.py` (21 tests, 258 lines)
+**Quality Score**: 62/100 (C - Needs Improvement)
+**Review Date**: 2026-01-04
+**Review Scope**: suite
+**Reviewer**: Murat (TEA Agent)
 
 ---
 
 ## Executive Summary
 
-| Metric | Value |
-|--------|-------|
-| **Combined Quality Score** | **94/100 (A+)** |
-| **Recommendation** | ✅ **Approve** |
-| **Critical Issues** | 0 |
-| **High Priority** | 2 (recommendations) |
-| **Total Tests** | 37 |
-| **Execution Time** | 0.81s |
+**Overall Assessment**: Needs Improvement
 
-**Overall Assessment:** Excellent test quality. Both files demonstrate strong adherence to best practices with BDD documentation, explicit assertions, proper isolation, and fast execution. Minor improvements recommended for long-term maintainability.
+**Recommendation**: Request Changes
+
+### Key Strengths
+
+✅ **No hard waits detected** (no `sleep()` usage in the suite)
+
+✅ **Good isolation patterns** via `tmp_path`/temporary directories across integration-heavy tests
+
+✅ **Clear test organization** with `pytest.ini` markers and `--strict-markers`
+
+### Key Weaknesses
+
+❌ **Oversized test modules** (24 files >300 LOC; 12 files >500 LOC) reduce readability and reviewability
+
+❌ **Too much of the ATDD/RED-phase suite is skipped** (48 `pytest.skip()` occurrences), lowering CI signal
+
+❌ **Non-deterministic factories** (`random.*`, `datetime.now()`) risk intermittent failures and reduce reproducibility
+
+### Summary
+
+This test suite has strong bones: it avoids timing hacks, uses isolation-friendly temp paths, and has clear marker taxonomy with strict marker enforcement. The two biggest problems are **maintainability (very large test modules)** and **signal quality (a large chunk of acceptance tests are currently skipped)**. Fixing those will raise confidence quickly without changing product behavior.
 
 ---
 
 ## Quality Criteria Assessment
 
-### test_session.py (93/100 - Grade A)
+| Criterion                            | Status    | Violations | Notes |
+| ------------------------------------ | --------- | ---------- | ----- |
+| BDD Format (Given-When-Then)         | ⚠️ WARN   | 0          | Present in some tests via docstrings (e.g., `tests/database/test_session.py`), not consistent suite-wide |
+| Test IDs                             | ⚠️ WARN   | 0          | Some traceability via story references in docstrings; no consistent test ID convention |
+| Priority Markers (P0/P1/P2/P3)       | ✅ PASS   | 0          | Markers are defined and enforced (`pytest.ini:17-27`) |
+| Hard Waits (sleep, waitForTimeout)   | ✅ PASS   | 0          | No `sleep()` detected in `tests/` |
+| Determinism (no conditionals/random) | ⚠️ WARN   | 2          | Random/date-now used in test factories (`tests/support/factories/transaction.py:1-35`, `tests/support/helpers/test_data.py:54-72`) |
+| Isolation (cleanup, no shared state) | ✅ PASS   | 0          | Heavy use of `tmp_path`/temp dirs; DB tests use in-memory DB fixtures |
+| Fixture Patterns                     | ✅ PASS   | 0          | Shared `tests/conftest.py` plus local per-module fixtures |
+| Data Factories                       | ⚠️ WARN   | 1          | Factories exist but default randomness/time-now reduces reproducibility |
+| Network-First Pattern                | ✅ PASS   | 0          | N/A (no browser automation suite); no external network client usage detected |
+| Explicit Assertions                  | ✅ PASS   | 0          | Pytest `assert` usage is consistent |
+| Test Length (≤300 lines)             | ❌ FAIL   | 24         | 12 files >500 LOC, 12 files 301–500 LOC |
+| Test Duration (≤1.5 min)             | ⚠️ WARN   | 2          | `@pytest.mark.slow` exists but large test modules + PDF parsing implies slow paths |
+| Flakiness Patterns                   | ⚠️ WARN   | 1          | Skipped tests reduce signal; randomness/time-now could cause intermittent failures |
 
-| Criterion | Status | Notes |
-|-----------|--------|-------|
-| BDD Format | ✅ PASS | All 16 tests have GIVEN-WHEN-THEN docstrings |
-| Test Naming | ✅ PASS | Descriptive names (e.g., `test_get_session_commits_on_success`) |
-| Hard Waits | ✅ N/A | No async/hard waits (synchronous pytest) |
-| Determinism | ✅ PASS | No random data, uses `tmp_path` for isolation |
-| Isolation | ✅ PASS | Each test uses fresh temp directory |
-| Fixture Patterns | ⚠️ WARN | Uses `tmp_path` but creates data inline |
-| Data Factories | ⚠️ WARN | Creates test data inline instead of factories |
-| Assertions | ✅ PASS | All assertions explicit in test bodies |
-| Test Length | ⚠️ WARN | 350 lines (threshold: 300) |
-| Test Duration | ✅ PASS | 0.3s total for 16 tests (<0.02s each) |
-
-**Score Breakdown:**
-- Starting: 100
-- High violations (1 × -5): -5 (inline data creation)
-- Medium violations (1 × -2): -2 (>300 lines)
-- Bonus: +15 (BDD +5, explicit assertions +5, perfect isolation +5)
-- **Final: 93/100**
+**Total Violations**: 0 Critical, 2 High, 17 Medium, 14 Low
 
 ---
 
-### test_cli.py (95/100 - Grade A+)
+## Quality Score Breakdown
 
-| Criterion | Status | Notes |
-|-----------|--------|-------|
-| BDD Format | ✅ PASS | All 21 tests have GIVEN-WHEN-THEN docstrings |
-| Test Naming | ✅ PASS | Clear behavioral names |
-| Hard Waits | ✅ N/A | No async/hard waits |
-| Determinism | ✅ PASS | No random data, deterministic CLI invocations |
-| Isolation | ✅ PASS | Fresh `CliRunner` invocation per test |
-| Fixture Patterns | ⚠️ WARN | Module-level `runner` instead of fixture |
-| Data Factories | ✅ N/A | Not applicable for CLI tests |
-| Assertions | ✅ PASS | All assertions explicit |
-| Test Length | ✅ PASS | 258 lines (<300 threshold) |
-| Test Duration | ✅ PASS | 0.5s total for 21 tests (<0.025s each) |
+```
+Starting Score:          100
+Critical Violations:     -0 × 10 = 0
+High Violations:         -2 × 5 = -10
+Medium Violations:       -17 × 2 = -34
+Low Violations:          -14 × 1 = -14
 
-**Score Breakdown:**
-- Starting: 100
-- High violations (1 × -5): -5 (module-level runner)
-- Bonus: +15 (BDD +5, explicit assertions +5, perfect isolation +5)
-- **Final: 95/100**
+Bonus Points:
+  Excellent BDD:         +0
+  Comprehensive Fixtures: +5
+  Data Factories:        +0
+  Network-First:         +0
+  Perfect Isolation:     +5
+  All Test IDs:          +0
+                         --------
+Total Bonus:             +10
+
+Final Score:             62/100
+Grade:                   C
+```
 
 ---
 
-## Strengths (What's Done Well)
+## Critical Issues (Must Fix)
 
-### 1. Excellent BDD Documentation
-All tests follow Given-When-Then structure in docstrings:
+### 1. Oversized test modules (review/maintenance risk)
 
-```python
-def test_get_session_commits_on_success(self, tmp_path):
-    """
-    GIVEN a session with pending changes
-    WHEN session block completes without exception
-    THEN changes are committed to database.
-    """
-```
+**Severity**: P1 (High)
 
-**Impact:** Tests are self-documenting, easy to understand intent.
+**Location**: Multiple files (suite-wide)
 
-### 2. Explicit Assertions
-All assertions are visible in test bodies, not hidden in helpers:
+**Criterion**: Test Length
 
-```python
-# Good - explicit assertions
-assert engine is not None
-assert "sqlite" in str(engine.url)
-assert result[0].lower() == "wal"
-```
+**Issue Description**:
 
-**Impact:** Failures are immediately actionable.
+24 test files exceed the 300-line maintainability guideline; 12 are over 500 lines. This makes changes risky: reviews are slower, failures are harder to localize, and refactors become expensive.
 
-### 3. Perfect Isolation
-- `test_session.py`: Uses `tmp_path` fixture for fresh DB each test
-- `test_cli.py`: Each `runner.invoke()` is independent
+**Hotspots (>500 LOC)**:
 
-**Impact:** Tests run reliably in parallel, no shared state.
+- `tests/reports/test_charts.py` (1001 LOC)
+- `tests/queries/test_spending_query.py` (945 LOC)
+- `tests/categorization/test_categorization_atdd.py` (637 LOC)
+- `tests/parsers/test_batch_import.py` (600 LOC)
+- `tests/reports/test_generator.py` (592 LOC)
+- `tests/test_cli.py` (542 LOC)
+- `tests/e2e/test_query_engine_workflow.py` (538 LOC)
+- `tests/parsers/test_gcash_parser.py` (536 LOC)
+- `tests/export/test_exporter.py` (524 LOC)
+- `tests/e2e/test_account_info_extraction.py` (515 LOC)
+- `tests/dedup/test_detector.py` (512 LOC)
+- `tests/parsers/test_gcash_parser_atdd.py` (510 LOC)
 
-### 4. Fast Execution
-- 37 tests in 0.81 seconds
-- Individual tests: <0.025s average
+**Recommended Fix**:
 
-**Impact:** Rapid feedback, doesn't slow CI/CD.
+Split by behavior and/or component boundary.
+
+- Prefer “one module = one feature area” (e.g., `spending_query` split into `test_spending_query_filters.py`, `test_spending_query_aggregates.py`, `test_spending_query_sorting.py`)
+- Extract repetitive setup into fixtures/helpers; keep assertions in the test body.
+
+---
+
+### 2. Skipped ATDD/RED-phase tests reduce suite signal
+
+**Severity**: P1 (High)
+
+**Location**:
+
+- `tests/categorization/test_categorization_atdd.py` (14 `pytest.skip()` calls; e.g. `:50, :77, :123`)
+- `tests/parsers/test_gcash_parser_atdd.py` (12 calls; e.g. `:51, :78, :107`)
+- `tests/e2e/test_query_engine_workflow.py` (11 calls; e.g. `:48, :88, :131`)
+- `tests/e2e/test_export_workflow.py` (8 calls; currently commented out in places)
+
+**Criterion**: Flakiness Patterns / Suite Signal
+
+**Issue Description**:
+
+Large parts of the suite are intentionally skipped (“implementation pending”). That’s fine during TDD, but it makes the default suite less useful as a quality gate (green doesn’t necessarily mean covered).
+
+**Recommended Fix**:
+
+- Replace in-test `pytest.skip()` with explicit markers like `@pytest.mark.atdd` + default exclusion in CI (or a separate CI job for ATDD).
+- Where appropriate, convert “expected to fail until built” to `xfail(strict=True)` so the suite tracks progress without hiding tests.
 
 ---
 
 ## Recommendations (Should Fix)
 
-### R1: Extract Data Creation to Factory Functions (P1)
+### 1. Make factories deterministic by default
 
-**File:** `tests/database/test_session.py`
-**Lines:** 135, 166, 192, etc.
-**Issue:** Test data created inline throughout tests
+**Severity**: P2 (Medium)
 
-```python
-# Current (inline creation)
-account = Account(name="Test Account", bank_type="gcash")
-session.add(account)
-```
+**Location**:
 
-**Recommended:**
-```python
-# Create factories in tests/factories/database.py
-def create_account(
-    name: str = "Test Account",
-    bank_type: str = "gcash",
-    **overrides
-) -> Account:
-    return Account(
-        name=name,
-        bank_type=bank_type,
-        **overrides
-    )
+- `tests/support/factories/transaction.py:1-35`
+- `tests/support/factories/statement.py:15-19`
+- `tests/support/helpers/test_data.py:54-72`
 
-# Usage in tests
-account = create_account()  # Uses defaults
-account = create_account(bank_type="bpi")  # Override specific field
-```
+**Criterion**: Determinism / Data Factories
 
-**Benefit:** DRY, easier maintenance, consistent test data.
+**Issue Description**:
+
+Factories default to `random.*` and `datetime.now()`. That’s great for realism, but it can create hidden variability: different dates/amounts/categories per run can produce brittle expectations, and failures are harder to reproduce.
+
+**Recommended Improvement**:
+
+- Add an opt-in seeded RNG fixture (e.g., `rng = random.Random(0)`) and pass it into generators.
+- Default timestamps to a fixed date in factories unless explicitly overridden.
 
 ---
 
-### R2: Convert Module-Level Runner to Fixture (P1)
+### 2. Avoid implicit imports via `import *` in `tests/conftest.py`
 
-**File:** `tests/test_cli.py`
-**Line:** 16
-**Issue:** `runner = CliRunner()` at module level
+**Severity**: P3 (Low)
 
-```python
-# Current (module level)
-runner = CliRunner()
+**Location**: `tests/conftest.py:17` (`from tests.support.fixtures.files import *`)
 
-class TestVersionCommand:
-    def test_version_command(self):
-        result = runner.invoke(app, ["version"])
-```
+**Criterion**: Maintainability
 
-**Recommended:**
-```python
-# Use pytest fixture
-import pytest
-from typer.testing import CliRunner
+**Issue Description**:
 
-@pytest.fixture
-def runner():
-    return CliRunner()
+`import *` hides dependencies (e.g., it implicitly provides `pytest` into the module namespace). This makes the test harness harder to reason about and easier to break during refactors.
 
-class TestVersionCommand:
-    def test_version_command(self, runner):
-        result = runner.invoke(app, ["version"])
-```
+**Recommended Improvement**:
 
-**Benefit:** Follows pytest patterns, better isolation semantics.
+Import explicitly:
+
+- `import pytest`
+- `from tests.support.fixtures.files import real_bpi_pdf_path, real_gcash_pdf_path`
 
 ---
 
-### R3: Consider Splitting test_session.py (P2)
+## Best Practices Found
 
-**File:** `tests/database/test_session.py`
-**Issue:** 350 lines (threshold: 300)
+### 1. Marker taxonomy + strict enforcement
 
-**Options:**
-1. Split into `test_session_engine.py` and `test_session_init.py`
-2. Extract `TestSessionIntegration` to separate file
+**Location**: `pytest.ini:17-27`
 
-**Current structure:**
-- TestGetEngine (6 tests) - 100 lines
-- TestGetSession (5 tests) - 90 lines
-- TestInitDb (4 tests) - 60 lines
-- TestSessionIntegration (1 test) - 40 lines
+**Why This Is Good**:
 
-**Benefit:** Easier navigation, faster focused test runs.
+Markers are clearly documented and `--strict-markers` prevents typo-based silent misclassification.
 
----
+### 2. Strong isolation discipline for integration tests
 
-## Quality Score Summary
+**Location**: widespread `tmp_path` usage (e.g., `tests/database/test_session.py:23-78`)
 
-| File | Score | Grade | Status |
-|------|-------|-------|--------|
-| test_session.py | 93/100 | A | ✅ Pass |
-| test_cli.py | 95/100 | A+ | ✅ Pass |
-| **Combined** | **94/100** | **A+** | ✅ **Approve** |
+**Why This Is Good**:
+
+Temp paths reduce state pollution and keep tests parallel-safe.
 
 ---
 
-## Verification Commands
+## Test File Analysis
 
-```bash
-# Run reviewed tests
-uv run pytest tests/database/test_session.py tests/test_cli.py -v
+### File Metadata
 
-# Run with coverage
-uv run pytest tests/database/test_session.py tests/test_cli.py --cov=analyze_fin --cov-report=term-missing
+- **Test Root**: `tests/`
+- **Test Framework**: pytest
+- **Files Scanned**: 49 python files
 
-# Run in parallel (verify isolation)
-uv run pytest tests/database/test_session.py tests/test_cli.py -n auto
-```
+### Length Hotspots
 
----
+- **Files >300 LOC**: 24
+- **Files >500 LOC**: 12
 
-## Conclusion
+### Skips / Expected Failures
 
-**Recommendation: ✅ APPROVE**
-
-The tests demonstrate excellent quality with strong BDD documentation, explicit assertions, proper isolation, and fast execution. The two recommendations (data factories, fixture for runner) are enhancements for long-term maintainability, not blockers.
-
-These tests are production-ready and provide solid coverage for the database session and CLI modules.
+- **`pytest.skip()` occurrences**: 48 across 6 files
+- **`@pytest.mark.xfail`**: present (e.g., `tests/e2e/test_bpi_real_e2e.py:14`)
 
 ---
 
-_Generated by TEA (Test Architect) `*test-review` workflow on 2025-12-23_
+## Knowledge Base References
+
+This review consulted the following TEA fragments (adapted to pytest/Python context):
+
+- **`test-quality.md`** - Determinism, isolation, explicit assertions, size/time constraints
+- **`data-factories.md`** - Factory overrides and reproducibility principles
+- **`test-levels-framework.md`** - Unit vs integration vs E2E placement and duplicate coverage avoidance
+- **`selective-testing.md`** - Tag/marker-based selection strategy
+- **`test-healing-patterns.md`** - Failure pattern catalog mindset (timing, data variability)
+
+---
+
+## Next Steps
+
+### Immediate Actions (Before Merge)
+
+1. **Split the top 3 largest test modules** (`test_charts.py`, `test_spending_query.py`, `test_categorization_atdd.py`)
+   - Priority: P1
+   - Owner: Dev
+   - Estimated Effort: 2–6 hours
+
+2. **Convert the skip-heavy ATDD files to marker-driven selection** (so default CI has clear signal)
+   - Priority: P1
+   - Owner: Dev
+   - Estimated Effort: 1–3 hours
+
+### Follow-up Actions (Future PRs)
+
+1. **Deterministic factories by default** (seeded RNG + fixed timestamps unless overridden)
+   - Priority: P2
+   - Target: next sprint
+
+2. **Remove `import *` from `tests/conftest.py`**
+   - Priority: P3
+   - Target: backlog
+
+### Re-Review Needed?
+
+⚠️ Re-review after critical fixes - request changes, then re-review
+
+---
+
+## Decision
+
+**Recommendation**: Request Changes
+
+**Rationale**:
+
+There are no immediate “flaky timing” blockers (a big win), but the current suite is hard to maintain due to very large modules, and the default signal is diluted by many intentionally skipped ATDD tests. Addressing those two issues will materially improve confidence and keep test debt from compounding.
+
+---
+
+## Review Metadata
+
+**Generated By**: BMad TEA Agent (Test Architect)
+
+**Workflow**: testarch-test-review v4.0
+
+**Review ID**: test-review-suite-20260104
+
+**Timestamp**: 2026-01-04

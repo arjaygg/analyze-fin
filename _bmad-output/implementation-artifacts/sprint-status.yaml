@@ -38,8 +38,8 @@ project: analyze-fin
 project_key: analyze-fin
 tracking_system: file-system
 story_location: /Users/agallentes/git/analyze-fin/_bmad-output/implementation-artifacts
-last_updated: 2026-01-02
-updated_by: Scrum Master (Create Story 4.1)
+last_updated: 2026-01-04
+updated_by: Senior Developer Review (AI) - Code review of Stories 1-5, 3-4, 3-5, 3-6, 4-1
 
 development_status:
   # Epic 1: Import Bank Statements - ✅ COMPLETE
@@ -48,7 +48,7 @@ development_status:
   1-2-gcash-statement-parser: done
   1-3-bpi-statement-parser-with-password-handling: done
   1-4-maya-statement-parser: done
-  1-5-batch-import-quality-reporting: review
+  1-5-batch-import-quality-reporting: done
   epic-1-retrospective: optional
 
   # Epic 2: Transaction Intelligence - ✅ COMPLETE
@@ -60,42 +60,70 @@ development_status:
   2-5-learning-system-manual-corrections: done
   epic-2-retrospective: optional
 
-  # Epic 3: Insights & Reporting - ⚠️ IN PROGRESS (67% complete)
-  epic-3: in-progress
+  # Epic 3: Insights & Reporting - ✅ COMPLETE
+  epic-3: done
   3-1-query-engine-basic-filters: done
   3-2-aggregations-spending-analytics: done
   3-3-time-period-comparisons: done
-  3-4-visualization-with-plotly-charts: review
-  3-5-report-generation-html-markdown: review
-  3-6-natural-language-query-interface: review
+  3-4-visualization-with-plotly-charts: done
+  3-5-report-generation-html-markdown: done
+  3-6-natural-language-query-interface: done
   epic-3-retrospective: optional
 
-  # Epic 4: Advanced Features - ⚠️ IN PROGRESS (33% complete)
+  # Epic 4: Advanced Features - ⚠️ IN PROGRESS (29% complete)
   epic-4: in-progress
-  4-1-data-export-csv-json: ready-for-dev
+  4-1-data-export-csv-json: done  # Code review APPROVED 2026-01-04
   4-2-configuration-system: backlog
   4-3-cli-modes-interactive-vs-batch: in-progress
   4-4-output-format-flags-exit-codes: in-progress
   4-5-claude-skills-integration: done
   4-6-advanced-cli-features-polish: in-progress
+  4-7-unified-parse-workflow: review
   epic-4-retrospective: optional
 
-# COMPLETION SUMMARY (as of 2026-01-02):
+  # Epic 5: Account Identification & Multi-Account Support - 🆕 NEW
+  epic-5: in-progress
+  5-1-parser-account-identifier-extraction: done
+  5-2-database-schema-multi-account-support: backlog
+  5-3-account-context-in-reports-queries: backlog
+  5-4-account-scoped-deduplication: backlog
+  5-5-skill-updates-for-account-context: backlog
+  epic-5-retrospective: optional
+
+# COMPLETION SUMMARY (as of 2026-01-04 - POST CODE REVIEW):
 # =============================================
-# Total Stories: 22
-# Done: 14 (64%)
-# Ready for Dev: 1 (5%)
-# In Progress: 5 (23%)
-# Backlog: 2 (9%)
+# Total Stories: 28
+# Done: 16 (57%) - Story 4-1 APPROVED and moved to done
+# Review: 1 (4%) - Story 4.7 Unified Parse Workflow
+# In Progress: 3 (11%)
+# Backlog: 8 (28%) - includes 4 remaining Epic 5 stories
 #
-# Epic 1: 100% ✅ (5/5 stories done, 1 in final cleanup)
+# Epic 1: 100% ✅ (5/5 stories done)
 # Epic 2: 100% ✅ (5/5 stories done)
-# Epic 3: 67% ⚠️ (3 done, 3 in-progress with review items)
-# Epic 4: 33% ⚠️ (1 done, 3 in-progress, 1 ready-for-dev, 1 backlog)
+# Epic 3: 100% ✅ (6/6 stories done)
+# Epic 4: 43% ⚠️ (3/7 done, 3 in-progress, 1 backlog)
+# Epic 5: 20% 🔄 (1/5 stories done - Story 5.1 COMPLETED)
+#
+# STORY 4.7 CREATED (2026-01-04):
+# - Unified Parse Workflow - consolidates parse + categorize + deduplicate
+# - Removes standalone categorize-transactions and deduplicate-transactions skills
+# - Parse-statements skill becomes the single entry point for imports
 #
 # NEXT ACTIONS:
-# - ✅ Story 4.1 ready-for-dev - comprehensive story context created
-# - Complete Story 1.5 review items
-# - Complete Story 3.4, 3.5, 3.6 review items
+# - Implement Story 4.7 (Unified Parse Workflow) - ready-for-dev
+# - Complete Epic 4 remaining stories (4.2, 4.3, 4.4, 4.6)
 # - Run code-review workflow on completed stories
-# - Address remaining Epic 4 backlog story (4.2)
+# - Continue Epic 5 with Story 5.2 (Database schema for multi-account support)
+#
+# CODE REVIEW ACTION ITEMS (2026-01-04):
+# ======================================
+# Reviewed: Stories 1-5, 3-4, 3-5, 3-6, 4-1 - ALL APPROVED
+#
+# Cross-Project Code Quality (LOW priority - non-blocking):
+# - [ ] Fix Ruff B007 in dedup/detector.py:104,119 - rename unused loop vars to _tx_hash, _ref_num
+# - [ ] Fix Ruff B905 in dedup/detector.py:405 - add strict= param to zip()
+# - [ ] Commit all uncommitted changes (36 files, 2606 insertions)
+#
+# Story-Specific Items:
+# - [x] Story 4-1: Status synced to "done" (line 75)
+# - [ ] Story 4-1: Update test count in File List (32 tests, not 30)

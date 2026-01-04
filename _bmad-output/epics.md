@@ -8,9 +8,10 @@ project_name: 'analyze-fin'
 user_name: 'arjay'
 date: '2025-12-15'
 completedAt: '2025-12-15'
+lastUpdated: '2026-01-04'
 status: 'complete'
-totalEpics: 4
-totalStories: 22
+totalEpics: 5
+totalStories: 27
 validationStatus: 'passed'
 ---
 
@@ -1567,4 +1568,245 @@ So that users have a professional, polished experience.
 **And** Project follows architecture and context rules exactly
 
 **Requirements:** FR44-FR48, AR5, AR22-AR24, All NFRs
+
+
+
+---
+
+## Epic 5: Account Identification & Multi-Account Support
+
+**Value:** Enable accurate tracking of transactions across multiple accounts of the same bank type, ensuring all downstream skills properly display and respect account context.
+
+**User Outcome:** Users with multiple accounts (e.g., personal and business GCash) can see spending separated by account, with reports clearly showing which account data comes from.
+
+**PRD Requirements:** FR49-FR58 (Account Identification & Multi-Account Support)
+
+**Technical Scope:**
+- Enhance parsers to extract account identifiers from PDFs
+- Update database schema with account_number field
+- Propagate account context to all downstream skills
+- Update report generation to display account information
+
+---
+
+### Story 5.1: Parser Account Identifier Extraction
+
+As a user,
+I want the system to extract unique account identifiers from my bank statements,
+So that transactions from different accounts are properly distinguished.
+
+**Acceptance Criteria:**
+
+**Given** a GCash statement PDF
+**When** the parser extracts transaction data
+**Then** Mobile number (account identifier) is extracted and stored
+**And** Account holder name is extracted when available
+**And** Statement period (start/end dates) is extracted
+**And** ParseResult includes account_number, account_holder, statement_period fields
+
+**Given** a BPI statement PDF
+**When** the parser extracts transaction data
+**Then** Account number (masked, e.g., "****1234") is extracted from header
+**And** Account holder name is extracted
+**And** Statement period is extracted
+**And** Account type (savings/checking) is detected if available
+
+**Given** a Maya statement PDF
+**When** the parser extracts transaction data
+**Then** Account number/ID is extracted
+**And** Account holder name is extracted
+**And** Statement period is extracted
+**And** Account type (savings/wallet) is properly identified
+
+**Given** account identifier cannot be extracted
+**When** PDF format doesnt contain expected account info
+**Then** System logs warning but continues parsing
+**And** account_number defaults to null (backwards compatible)
+**And** Quality score is reduced to indicate incomplete extraction
+
+**Requirements:** FR49, FR50, FR51
+
+---
+
+### Story 5.2: Database Schema & Multi-Account Support
+
+As a user,
+I want the system to support multiple accounts of the same bank type,
+So that my personal and business accounts remain separate.
+
+**Acceptance Criteria:**
+
+**Given** the accounts table exists
+**When** I run database migration
+**Then** accounts table has new columns: account_number (String, nullable), account_holder (String, nullable)
+**And** Composite unique constraint on (bank_type, account_number) prevents duplicates
+**And** Existing data migrates gracefully (null account_number allowed)
+
+**Given** I import two GCash statements from different accounts
+**When** statements have different mobile numbers
+**Then** Two separate Account records are created
+**And** Each account has distinct account_number
+**And** Transactions link to correct account via statement relationship
+
+**Given** I re-import a statement from existing account
+**When** bank_type and account_number match existing account
+**Then** Existing Account record is reused (no duplicate created)
+**And** New Statement links to existing Account
+**And** Transactions are added correctly
+
+**Given** legacy data without account_number
+**When** querying accounts
+**Then** System handles null account_number gracefully
+**And** Reports show "Unknown Account" or similar for legacy data
+**And** No crashes or errors from missing data
+
+**Requirements:** FR52, FR53
+
+---
+
+### Story 5.3: Account Context in Reports & Queries
+
+As a user,
+I want reports and queries to show which account data comes from,
+So that I know the source of my financial information.
+
+**Acceptance Criteria:**
+
+**Given** I generate a spending report
+**When** report is rendered (HTML or Markdown)
+**Then** Report header displays account information
+**And** Format: "Account: [Account Name] ([Bank Type] ****1234)"
+**And** If multiple accounts, all are listed
+**And** Statement period is shown in header
+
+**Given** SpendingReport dataclass
+**When** report is generated
+**Then** SpendingReport includes account_names: list[str] field
+**And** Report generator reads account info via ORM relationships
+**And** No code changes needed in template if using passed data
+
+**Given** I query spending data
+**When** results are displayed
+**Then** Each transaction shows account source
+**And** Format includes account name/identifier
+**And** Query results can be filtered by account
+
+**Given** I use the query skill
+**When** I ask "Show food spending from GCash"
+**Then** SpendingQuery supports account filter
+**And** Results only include transactions from specified account
+**And** Natural language parser understands account references
+
+**Given** I use --account flag in CLI
+**When** I run: `analyze-fin query --category Food --account "GCash Personal"`
+**Then** Results are filtered to specified account only
+**And** Multiple --account flags can be combined (OR logic)
+**And** Invalid account name shows helpful error
+
+**Requirements:** FR54, FR55, FR56, FR58
+
+---
+
+### Story 5.4: Account-Scoped Deduplication
+
+As a user,
+I want duplicate detection to consider account context,
+So that transfers between my own accounts arent incorrectly flagged.
+
+**Acceptance Criteria:**
+
+**Given** duplicate detection is running
+**When** comparing transactions for duplicates
+**Then** Default behavior: only compare within same account
+**And** Transaction from GCash is NOT compared to BPI transaction
+**And** Reduces false positives from cross-account transfers
+
+**Given** I want cross-account duplicate detection
+**When** I use --cross-account flag
+**Then** Duplicates are checked across all accounts
+**And** Useful for finding true duplicates from re-imports
+**And** Warning shown: "Cross-account mode may flag transfers"
+
+**Given** internal transfer between own accounts
+**When** GCash shows "-₱5,000 Transfer to BPI" and BPI shows "+₱5,000 Transfer from GCash"
+**Then** These are NOT flagged as duplicates (different accounts, different amounts)
+**And** System correctly identifies as internal transfer (FR10)
+**And** Both transactions are preserved
+
+**Given** same account duplicate detection
+**When** same statement imported twice
+**Then** Duplicates are detected within that account
+**And** Reference number matching works
+**And** Content hash matching works
+**And** User can review and resolve
+
+**Requirements:** FR57
+
+---
+
+### Story 5.5: Skill Updates for Account Context
+
+As a user,
+I want all Claude Skills to understand and display account context,
+So that my conversational experience includes accurate source attribution.
+
+**Acceptance Criteria:**
+
+**Given** parse-statements skill
+**When** statement is successfully parsed
+**Then** Skill reports: "Imported to account: [Name] ([Bank] ****1234)"
+**And** If new account created, reports: "New account detected and created"
+**And** Account info is part of success message
+
+**Given** generate-report skill
+**When** generating report
+**Then** Skill mentions which account(s) are included
+**And** If single account: "Generating report for GCash Personal"
+**And** If multiple: "Generating report for 3 accounts"
+
+**Given** query-spending skill
+**When** answering spending questions
+**Then** Results include account attribution
+**And** User can ask: "How much from my BPI account?"
+**And** Clarification asked if ambiguous: "Which account? GCash Personal or GCash Business?"
+
+**Given** export-data skill
+**When** exporting data
+**Then** Export includes account column (already implemented, verify working)
+**And** User can filter export by account
+**And** Exported filename can include account name
+
+**Given** categorize-transactions skill
+**When** showing transactions for categorization
+**Then** Account source is displayed with each transaction
+**And** Format: "[Date] [Description] [Amount] (GCash Personal)"
+**And** Helps user understand transaction context
+
+**Given** deduplicate-transactions skill
+**When** showing potential duplicates
+**Then** Account is shown for each transaction in duplicate group
+**And** Cross-account duplicates clearly marked as such
+**And** User understands context before making decision
+
+**Requirements:** FR54, FR55, FR56, FR58
+
+---
+
+## Epic 5 Summary
+
+| Story | Focus | Key Deliverables |
+|-------|-------|------------------|
+| 5.1 | Parser Enhancement | Extract account_number, account_holder, statement_period from all bank PDFs |
+| 5.2 | Database Schema | Add columns, composite unique key, migration, multi-account support |
+| 5.3 | Reports & Queries | Account context in headers, SpendingQuery account filter, CLI --account flag |
+| 5.4 | Deduplication | Account-scoped default, --cross-account option, transfer handling |
+| 5.5 | Skill Updates | All 6 skills display and respect account context |
+
+**Dependencies:**
+- Story 5.1 must complete first (provides data for other stories)
+- Story 5.2 must complete before 5.3, 5.4, 5.5 (schema required)
+- Stories 5.3, 5.4, 5.5 can be parallelized after 5.2
+
+**Estimated Stories:** 5
+**New FRs Addressed:** FR49-FR58 (10 requirements)
 

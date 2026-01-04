@@ -1,6 +1,6 @@
 # Story 3.4: Visualization with Plotly Charts
 
-Status: review
+Status: done
 
 ## Story
 

@@ -1,6 +1,6 @@
 # Story 3.5: Report Generation (HTML & Markdown)
 
-Status: review
+Status: done
 
 ## Story
 
