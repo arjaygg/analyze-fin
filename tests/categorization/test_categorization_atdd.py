@@ -27,6 +27,11 @@ import pytest
 # from src.analyze_fin.categorization.normalizer import MerchantNormalizer
 # from src.analyze_fin.categorization.learning import LearningEngine
 
+pytestmark = [
+    pytest.mark.atdd,
+    pytest.mark.xfail(reason="RED phase - implementation pending", strict=True),
+]
+
 # ============================================================================
 # AC1: Auto-categorize transactions using merchant mapping (>90% accuracy)
 # ============================================================================
@@ -47,7 +52,7 @@ def test_categorize_known_merchant_assigns_correct_category(sample_merchant_mapp
     - [ ] Return category and confidence score
     - [ ] Run: pytest tests/categorization/test_categorization_atdd.py::test_categorize_known_merchant_assigns_correct_category
     """
-    pytest.skip("Implementation pending - awaiting MerchantCategorizer")
+    raise NotImplementedError("Implementation pending - awaiting MerchantCategorizer")
 
     # Expected implementation:
     # categorizer = MerchantCategorizer(sample_merchant_mapping)
@@ -74,7 +79,7 @@ def test_categorize_multiple_merchants_achieves_90_percent_accuracy(sample_trans
     - [ ] Measure categorization accuracy
     - [ ] Achieve >90% accuracy on test dataset
     """
-    pytest.skip("Implementation pending - awaiting batch categorization")
+    raise NotImplementedError("Implementation pending - awaiting batch categorization")
 
     # Expected implementation:
     # categorizer = MerchantCategorizer.load_default_mapping()
@@ -120,7 +125,7 @@ def test_normalize_merchant_name_across_variations(description, expected_normali
     - [ ] Standardize name format (Title Case)
     - [ ] Handle special cases (7-11 → 7-Eleven)
     """
-    pytest.skip("Implementation pending - awaiting MerchantNormalizer")
+    raise NotImplementedError("Implementation pending - awaiting MerchantNormalizer")
 
     # Expected implementation:
     # normalizer = MerchantNormalizer()
@@ -141,7 +146,7 @@ def test_normalize_preserves_merchant_identity():
     - [ ] Ensure normalization doesn't over-merge distinct merchants
     - [ ] Test edge cases: "SM Supermarket" vs "SM Department Store"
     """
-    pytest.skip("Implementation pending - awaiting distinct merchant handling")
+    raise NotImplementedError("Implementation pending - awaiting distinct merchant handling")
 
     # Expected implementation:
     # normalizer = MerchantNormalizer()
@@ -170,7 +175,7 @@ def test_categorize_unknown_merchant_returns_uncategorized():
     - [ ] Set confidence < 0.50 for unknown merchants
     - [ ] Log unknown merchant for review
     """
-    pytest.skip("Implementation pending - awaiting unknown merchant handling")
+    raise NotImplementedError("Implementation pending - awaiting unknown merchant handling")
 
     # Expected implementation:
     # categorizer = MerchantCategorizer({})  # Empty mapping
@@ -197,7 +202,7 @@ def test_categorize_lists_unknown_merchants_for_user_review():
     - [ ] Return list of unique unknown merchant descriptions
     - [ ] Provide method to get_unknown_merchants()
     """
-    pytest.skip("Implementation pending - awaiting unknown merchant tracking")
+    raise NotImplementedError("Implementation pending - awaiting unknown merchant tracking")
 
     # Expected implementation:
     # categorizer = MerchantCategorizer.load_default_mapping()
@@ -236,7 +241,7 @@ def test_learn_from_user_correction_updates_mapping():
     - [ ] Update in-memory merchant mapping
     - [ ] Apply learning to future categorizations
     """
-    pytest.skip("Implementation pending - awaiting LearningEngine")
+    raise NotImplementedError("Implementation pending - awaiting LearningEngine")
 
     # Expected implementation:
     # categorizer = MerchantCategorizer({})
@@ -268,7 +273,7 @@ def test_learn_applies_to_merchant_variations():
     - [ ] Fuzzy match learned merchants to variations
     - [ ] Apply learned category to similar merchant names
     """
-    pytest.skip("Implementation pending - awaiting variation matching")
+    raise NotImplementedError("Implementation pending - awaiting variation matching")
 
     # Expected implementation:
     # categorizer = MerchantCategorizer({})
@@ -298,7 +303,7 @@ def test_save_learned_mappings_to_json_file(temp_dir):
     - [ ] Use JSON format with proper structure
     - [ ] Preserve existing mappings when adding new ones
     """
-    pytest.skip("Implementation pending - awaiting save_mappings()")
+    raise NotImplementedError("Implementation pending - awaiting save_mappings()")
 
     # Expected implementation:
     # mapping_file = temp_dir / "merchant_mapping.json"
@@ -335,7 +340,7 @@ def test_load_mappings_from_json_file(temp_dir):
     - [ ] Read and parse JSON file
     - [ ] Initialize categorizer with loaded mappings
     """
-    pytest.skip("Implementation pending - awaiting load_from_file()")
+    raise NotImplementedError("Implementation pending - awaiting load_from_file()")
 
     # Expected implementation:
     # mapping_file = temp_dir / "merchant_mapping.json"
@@ -375,7 +380,7 @@ def test_fuzzy_match_handles_typos_and_variations(description, expected_match, m
     - [ ] Set confidence based on similarity score
     - [ ] Return best match above similarity threshold (e.g., 70%)
     """
-    pytest.skip("Implementation pending - awaiting fuzzy matching")
+    raise NotImplementedError("Implementation pending - awaiting fuzzy matching")
 
     # Expected implementation:
     # categorizer = MerchantCategorizer.load_default_mapping()
@@ -400,7 +405,7 @@ def test_fuzzy_match_confidence_decreases_with_similarity():
     - [ ] Close match (1-2 typos): confidence = 0.80-0.95
     - [ ] Distant match: confidence < 0.70
     """
-    pytest.skip("Implementation pending - awaiting confidence scaling")
+    raise NotImplementedError("Implementation pending - awaiting confidence scaling")
 
     # Expected implementation:
     # categorizer = MerchantCategorizer({"JOLLIBEE": {...}})
@@ -434,7 +439,7 @@ def test_batch_categorize_processes_100_transactions_under_1_second(sample_trans
     - [ ] Avoid redundant normalization
     - [ ] Cache fuzzy match results
     """
-    pytest.skip("Implementation pending - awaiting batch optimization")
+    raise NotImplementedError("Implementation pending - awaiting batch optimization")
 
     # Expected implementation:
     # import time
@@ -465,7 +470,7 @@ def test_batch_categorize_returns_summary_statistics():
     - [ ] Calculate average confidence score
     - [ ] Group by category with counts
     """
-    pytest.skip("Implementation pending - awaiting summary statistics")
+    raise NotImplementedError("Implementation pending - awaiting summary statistics")
 
     # Expected implementation:
     # categorizer = MerchantCategorizer.load_default_mapping()

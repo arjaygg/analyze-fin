@@ -20,6 +20,11 @@ import pytest
 # from analyze_fin.queries.spending import SpendingQuery
 # from typer.testing import CliRunner
 
+pytestmark = [
+    pytest.mark.atdd,
+    pytest.mark.xfail(reason="RED phase - implementation pending", strict=True),
+]
+
 
 # ============================================================================
 # AC1: Query transactions by category
@@ -45,7 +50,7 @@ def test_query_transactions_by_category(cli_runner, sample_transactions_in_db):
     - [ ] Show transaction count and total amount
     - [ ] Run: pytest tests/e2e/test_query_engine_workflow.py::test_query_transactions_by_category
     """
-    pytest.skip("RED phase - awaiting SpendingQuery implementation")
+    raise NotImplementedError("RED phase - awaiting SpendingQuery implementation")
 
     # Expected implementation:
     # result = cli_runner.invoke(app, [
@@ -85,7 +90,7 @@ def test_query_by_category_displays_formatted_output(cli_runner, sample_transact
     - [ ] Right-align numeric columns
     - [ ] Run: pytest tests/e2e/test_query_engine_workflow.py::test_query_by_category_displays_formatted_output
     """
-    pytest.skip("RED phase - awaiting output formatting")
+    raise NotImplementedError("RED phase - awaiting output formatting")
 
     # Expected implementation:
     # result = cli_runner.invoke(app, [
@@ -128,7 +133,7 @@ def test_query_transactions_by_merchant(cli_runner, sample_transactions_in_db):
     - [ ] Sort results by date DESC
     - [ ] Run: pytest tests/e2e/test_query_engine_workflow.py::test_query_transactions_by_merchant
     """
-    pytest.skip("RED phase - awaiting merchant query implementation")
+    raise NotImplementedError("RED phase - awaiting merchant query implementation")
 
     # Expected implementation:
     # result = cli_runner.invoke(app, [
@@ -171,7 +176,7 @@ def test_query_transactions_by_date_range(cli_runner, sample_transactions_in_db)
     - [ ] Add --date-range flag to CLI query command
     - [ ] Run: pytest tests/e2e/test_query_engine_workflow.py::test_query_transactions_by_date_range
     """
-    pytest.skip("RED phase - awaiting date range query implementation")
+    raise NotImplementedError("RED phase - awaiting date range query implementation")
 
     # Expected implementation:
     # result = cli_runner.invoke(app, [
@@ -206,7 +211,7 @@ def test_query_with_natural_language_date_range(cli_runner, sample_transactions_
     - [ ] Parse "Last week" → previous 7 days
     - [ ] Run: pytest tests/e2e/test_query_engine_workflow.py::test_query_with_natural_language_date_range
     """
-    pytest.skip("RED phase - awaiting natural language date parsing")
+    raise NotImplementedError("RED phase - awaiting natural language date parsing")
 
     # Expected implementation:
     # result = cli_runner.invoke(app, [
@@ -250,7 +255,7 @@ def test_query_transactions_above_amount_threshold(cli_runner, sample_transactio
     - [ ] Handle both positive and negative amounts
     - [ ] Run: pytest tests/e2e/test_query_engine_workflow.py::test_query_transactions_above_amount_threshold
     """
-    pytest.skip("RED phase - awaiting amount filter implementation")
+    raise NotImplementedError("RED phase - awaiting amount filter implementation")
 
     # Expected implementation:
     # result = cli_runner.invoke(app, [
@@ -283,7 +288,7 @@ def test_query_transactions_in_amount_range(cli_runner, sample_transactions_in_d
     - [ ] Inclusive range check: min <= amount <= max
     - [ ] Run: pytest tests/e2e/test_query_engine_workflow.py::test_query_transactions_in_amount_range
     """
-    pytest.skip("RED phase - awaiting amount range filter")
+    raise NotImplementedError("RED phase - awaiting amount range filter")
 
     # Expected implementation:
     # result = cli_runner.invoke(app, [
@@ -318,7 +323,7 @@ def test_query_with_combined_filters(cli_runner, sample_transactions_in_db):
     - [ ] Test: --category "Food & Dining" --date-range "Last 7 days" --amount-min 500
     - [ ] Run: pytest tests/e2e/test_query_engine_workflow.py::test_query_with_combined_filters
     """
-    pytest.skip("RED phase - awaiting combined filter support")
+    raise NotImplementedError("RED phase - awaiting combined filter support")
 
     # Expected implementation:
     # result = cli_runner.invoke(app, [
@@ -357,7 +362,7 @@ def test_query_with_no_matching_transactions(cli_runner, sample_transactions_in_
     - [ ] Exit code 0 (not an error)
     - [ ] Run: pytest tests/e2e/test_query_engine_workflow.py::test_query_with_no_matching_transactions
     """
-    pytest.skip("RED phase - awaiting empty result handling")
+    raise NotImplementedError("RED phase - awaiting empty result handling")
 
     # Expected implementation:
     # result = cli_runner.invoke(app, [
@@ -395,7 +400,7 @@ def test_query_performance_under_2_seconds(cli_runner, large_transactions_datase
     - [ ] Cache frequently used queries
     - [ ] Run: pytest tests/e2e/test_query_engine_workflow.py::test_query_performance_under_2_seconds
     """
-    pytest.skip("RED phase - awaiting performance optimization")
+    raise NotImplementedError("RED phase - awaiting performance optimization")
 
     # Expected implementation:
     # import time
@@ -439,7 +444,7 @@ def test_query_with_json_output_format(cli_runner, sample_transactions_in_db):
     - [ ] Amounts as strings for precision
     - [ ] Run: pytest tests/e2e/test_query_engine_workflow.py::test_query_with_json_output_format
     """
-    pytest.skip("RED phase - awaiting JSON format support")
+    raise NotImplementedError("RED phase - awaiting JSON format support")
 
     # Expected implementation:
     # import json

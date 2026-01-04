@@ -27,6 +27,11 @@ import pytest
 # from src.analyze_fin.parsers.base import ParseError, PasswordRequiredError
 # from src.analyze_fin.parsers.detector import BankTypeDetector
 
+pytestmark = [
+    pytest.mark.atdd,
+    pytest.mark.xfail(reason="RED phase - implementation pending", strict=True),
+]
+
 # ============================================================================
 # AC1: Extract transactions from valid GCash PDF with >95% accuracy
 # ============================================================================
@@ -48,7 +53,7 @@ def test_parse_valid_gcash_statement_extracts_all_transactions(sample_pdf_path):
     - [ ] Return ParseResult with transactions list
     - [ ] Run: pytest tests/parsers/test_gcash_parser_atdd.py::test_parse_valid_gcash_statement_extracts_all_transactions
     """
-    pytest.skip("Implementation pending - awaiting GCashParser class")
+    raise NotImplementedError("Implementation pending - awaiting GCashParser class")
 
     # Expected implementation:
     # parser = GCashParser()
@@ -75,7 +80,7 @@ def test_extracted_transaction_has_required_fields():
     - [ ] Parse amount field (format: "₱1,234.56" or "1234.56")
     - [ ] Return Transaction model with all fields
     """
-    pytest.skip("Implementation pending - awaiting GCashParser.extract_transaction()")
+    raise NotImplementedError("Implementation pending - awaiting GCashParser.extract_transaction()")
 
     # Expected implementation:
     # parser = GCashParser()
@@ -104,7 +109,7 @@ def test_parse_extracts_statement_metadata():
     - [ ] Extract statement period (month/year)
     - [ ] Add metadata to ParseResult
     """
-    pytest.skip("Implementation pending - awaiting metadata extraction")
+    raise NotImplementedError("Implementation pending - awaiting metadata extraction")
 
     # Expected implementation:
     # parser = GCashParser()
@@ -134,7 +139,7 @@ def test_parse_password_protected_pdf_raises_error_without_password():
     - [ ] Define PasswordRequiredError in src/analyze_fin/exceptions.py
     - [ ] Raise error with message: "PDF is password protected. Provide password."
     """
-    pytest.skip("Implementation pending - awaiting password detection")
+    raise NotImplementedError("Implementation pending - awaiting password detection")
 
     # Expected implementation:
     # parser = GCashParser()
@@ -158,7 +163,7 @@ def test_parse_password_protected_pdf_succeeds_with_correct_password():
     - [ ] Pass password to pdfplumber.open()
     - [ ] Successfully extract transactions from protected PDF
     """
-    pytest.skip("Implementation pending - awaiting password parameter")
+    raise NotImplementedError("Implementation pending - awaiting password parameter")
 
     # Expected implementation:
     # parser = GCashParser()
@@ -190,7 +195,7 @@ def test_quality_score_calculation_based_on_extraction_confidence():
     - [ ] Calculate average confidence across all transactions
     - [ ] Return score between 0.0 and 1.0
     """
-    pytest.skip("Implementation pending - awaiting quality score calculation")
+    raise NotImplementedError("Implementation pending - awaiting quality score calculation")
 
     # Expected implementation:
     # parser = GCashParser()
@@ -221,7 +226,7 @@ def test_quality_score_below_threshold_for_poor_extraction():
     - [ ] Quality score accurately reflects poor extractions
     - [ ] Log warning when quality score < 0.90
     """
-    pytest.skip("Implementation pending - awaiting quality score thresholds")
+    raise NotImplementedError("Implementation pending - awaiting quality score thresholds")
 
     # Expected implementation:
     # parser = GCashParser()
@@ -256,7 +261,7 @@ def test_detect_gcash_bank_type_from_pdf_content():
     - [ ] Search PDF text for "GCash" keyword
     - [ ] Return "gcash" when detected
     """
-    pytest.skip("Implementation pending - awaiting BankTypeDetector")
+    raise NotImplementedError("Implementation pending - awaiting BankTypeDetector")
 
     # Expected implementation:
     # detector = BankTypeDetector()
@@ -285,7 +290,7 @@ def test_parse_corrupted_pdf_raises_parse_error():
     - [ ] Wrap pdfplumber operations in try-except
     - [ ] Raise ParseError with message: "Failed to parse PDF: {reason}"
     """
-    pytest.skip("Implementation pending - awaiting error handling")
+    raise NotImplementedError("Implementation pending - awaiting error handling")
 
     # Expected implementation:
     # parser = GCashParser()
@@ -309,7 +314,7 @@ def test_parse_non_gcash_pdf_raises_parse_error():
     - [ ] Raise ParseError if bank type detection fails
     - [ ] Suggest using correct parser
     """
-    pytest.skip("Implementation pending - awaiting bank type validation")
+    raise NotImplementedError("Implementation pending - awaiting bank type validation")
 
     # Expected implementation:
     # parser = GCashParser()
@@ -340,7 +345,7 @@ def test_parse_batch_processes_multiple_statements(temp_dir):
     - [ ] Return list of ParseResults
     - [ ] Handle individual file failures gracefully (don't stop entire batch)
     """
-    pytest.skip("Implementation pending - awaiting batch parsing")
+    raise NotImplementedError("Implementation pending - awaiting batch parsing")
 
     # Expected implementation:
     # parser = GCashParser()
@@ -377,7 +382,7 @@ def test_balances_match_transaction_totals():
     - [ ] Validate balance reconciliation
     - [ ] Add validation_errors to ParseResult if mismatch
     """
-    pytest.skip("Implementation pending - awaiting balance validation")
+    raise NotImplementedError("Implementation pending - awaiting balance validation")
 
     # Expected implementation:
     # parser = GCashParser()

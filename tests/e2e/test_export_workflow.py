@@ -17,6 +17,11 @@ import pytest
 # from analyze_fin.cli import app
 # from typer.testing import CliRunner
 
+pytestmark = [
+    pytest.mark.atdd,
+    pytest.mark.xfail(reason="RED phase - implementation pending", strict=True),
+]
+
 
 # ============================================================================
 # AC1: Export all transactions to CSV with proper formatting
@@ -81,7 +86,7 @@ def test_export_all_transactions_to_csv(
     #     assert datetime.fromisoformat(first_row['date'])  # Valid ISO date
     #     assert Decimal(first_row['amount'])  # Valid decimal number
     #     assert '₱' not in first_row['amount']  # No currency symbol in CSV
-    pass
+    raise NotImplementedError("RED phase - awaiting CLI export command implementation")
 
 
 @pytest.mark.e2e
@@ -140,7 +145,7 @@ def test_export_all_transactions_to_json(
     #     assert isinstance(first_tx['date'], str)  # ISO string
     #     assert isinstance(first_tx['amount'], str)  # String for precision
     #     Decimal(first_tx['amount'])  # Can be converted to Decimal
-    pass
+    raise NotImplementedError("RED phase - awaiting CLI export command implementation")
 
 
 # ============================================================================
@@ -195,7 +200,7 @@ def test_export_filtered_by_date_range(
     #         tx_date = datetime.fromisoformat(row['date'])
     #         assert tx_date.year == 2024
     #         assert tx_date.month == 11
-    pass
+    raise NotImplementedError("RED phase - awaiting date range filter implementation")
 
 
 # ============================================================================
@@ -243,7 +248,7 @@ def test_export_filtered_by_category(
     #
     #     for row in rows:
     #         assert row['category'] == "Food & Dining"
-    pass
+    raise NotImplementedError("RED phase - awaiting category filter implementation")
 
 
 # ============================================================================
@@ -291,7 +296,7 @@ def test_export_filtered_by_merchant(
     #
     #     for row in rows:
     #         assert "Jollibee" in row['merchant']
-    pass
+    raise NotImplementedError("RED phase - awaiting merchant filter implementation")
 
 
 # ============================================================================
@@ -345,7 +350,7 @@ def test_export_with_combined_filters(
     #         assert tx_date.month == 11
     #         assert row['category'] == "Food & Dining"
     #         assert "Jollibee" in row['merchant']
-    pass
+    raise NotImplementedError("RED phase - awaiting combined filters implementation")
 
 
 # ============================================================================
@@ -393,7 +398,7 @@ def test_export_with_no_matching_transactions(cli_runner, temp_dir):
     #     rows = list(reader)
     #     assert len(rows) == 0
     #     assert reader.fieldnames is not None  # Headers present
-    pass
+    raise NotImplementedError("RED phase - awaiting empty result handling")
 
 
 # ============================================================================
@@ -440,7 +445,7 @@ def test_export_preserves_utf8_encoding(
     #     assert 'Señor Pollo' in content
     #     assert 'Café' in content
     #     assert '₱' in content or 'PHP' in content
-    pass
+    raise NotImplementedError("RED phase - awaiting UTF-8 handling implementation")
 
 
 # ============================================================================
@@ -474,7 +479,7 @@ def sample_transactions_in_db(db_session, test_data_factory):
     #     count = len(transactions)
     #
     # return MockResult()
-    pass
+    raise NotImplementedError("RED phase - fixture not implemented (awaiting database export wiring)")
 
 
 @pytest.fixture
@@ -497,4 +502,4 @@ def transactions_with_philippine_chars(db_session, test_data_factory):
     # for tx in transactions:
     #     db_session.add(Transaction(**tx))
     # db_session.commit()
-    pass
+    raise NotImplementedError("RED phase - fixture not implemented (awaiting database export wiring)")

@@ -1,9 +1,9 @@
 import random
-import uuid
 from datetime import datetime, timedelta
 from decimal import Decimal
 
 from analyze_fin.database.models import Transaction
+from tests.support.helpers.determinism import deterministic_uuid_hex, get_test_now
 
 def create_transaction(
     statement_id: int | None = None,
@@ -25,10 +25,10 @@ def create_transaction(
     
     defaults = {
         "statement_id": statement_id or random.randint(1, 1000),
-        "date": date or datetime.now() - timedelta(days=random.randint(0, 30)),
-        "description": f"Transaction {uuid.uuid4().hex[:8]}",
+        "date": date or get_test_now() - timedelta(days=random.randint(0, 30)),
+        "description": f"Transaction {deterministic_uuid_hex()}",
         "amount": amount,
-        "created_at": datetime.now(),
+        "created_at": get_test_now(),
         "category": random.choice(categories),
         "merchant_normalized": random.choice(merchants),
         "confidence": Decimal(f"{random.uniform(0.7, 1.0):.2f}"),

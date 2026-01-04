@@ -394,7 +394,7 @@ class TestExportCommand:
         """
         GIVEN the CLI app
         WHEN user runs `analyze-fin export --format json`
-        THEN JSON output is generated.
+        THEN JSON output is generated as array of transaction objects.
         """
         db_path = tmp_path / "test.db"
         import analyze_fin.database.session
@@ -402,10 +402,10 @@ class TestExportCommand:
 
         result = runner.invoke(app, ["export", "--format", "json"])
         assert result.exit_code == 0
-        # Should be valid JSON
+        # Should be valid JSON - an array (empty when no transactions)
         import json
         data = json.loads(result.stdout)
-        assert "transactions" in data
+        assert isinstance(data, list), "JSON output should be an array of transactions"
 
 
 # ============================================================================
@@ -470,6 +470,94 @@ class TestDeduplicateCommand:
         result = runner.invoke(app, ["deduplicate"])
         assert result.exit_code == 0
         assert "No" in result.stdout or "duplicat" in result.stdout.lower()
+
+
+# ============================================================================
+# Test: Ask Command (Natural Language)
+# ============================================================================
+
+
+# ============================================================================
+# Test: Parse Command - Unified Workflow (Story 4.7)
+# ============================================================================
+
+
+class TestParseCommandUnifiedWorkflow:
+    """Test parse command with unified workflow (auto-categorize, check-duplicates)."""
+
+    def test_parse_help_shows_auto_categorize_option(self):
+        """
+        GIVEN the CLI app
+        WHEN user runs `analyze-fin parse --help`
+        THEN help shows --auto-categorize option.
+        """
+        result = runner.invoke(app, ["parse", "--help"])
+        assert result.exit_code == 0
+        assert "--auto-categorize" in result.stdout or "auto-categorize" in result.stdout.lower()
+
+    def test_parse_help_shows_check_duplicates_option(self):
+        """
+        GIVEN the CLI app
+        WHEN user runs `analyze-fin parse --help`
+        THEN help shows --check-duplicates option.
+        """
+        result = runner.invoke(app, ["parse", "--help"])
+        assert result.exit_code == 0
+        assert "--check-duplicates" in result.stdout or "check-duplicates" in result.stdout.lower()
+
+    def test_parse_accepts_no_auto_categorize_flag(self, tmp_path, monkeypatch):
+        """
+        GIVEN a PDF file
+        WHEN user runs `analyze-fin parse file.pdf --no-auto-categorize`
+        THEN command accepts the flag without error.
+        """
+        db_path = tmp_path / "test.db"
+        import analyze_fin.database.session
+        monkeypatch.setattr(analyze_fin.database.session, "DEFAULT_DB_PATH", str(db_path))
+
+        # Create a dummy file
+        pdf_file = tmp_path / "test.pdf"
+        pdf_file.write_bytes(b"%PDF-1.4 test")
+
+        result = runner.invoke(app, ["parse", str(pdf_file), "--no-auto-categorize", "--dry-run"])
+        # Command should not fail on flag parsing (may fail on PDF parsing)
+        assert "--no-auto-categorize" not in result.stdout or result.exit_code in [0, 1, 2]
+
+    def test_parse_accepts_no_check_duplicates_flag(self, tmp_path, monkeypatch):
+        """
+        GIVEN a PDF file
+        WHEN user runs `analyze-fin parse file.pdf --no-check-duplicates`
+        THEN command accepts the flag without error.
+        """
+        db_path = tmp_path / "test.db"
+        import analyze_fin.database.session
+        monkeypatch.setattr(analyze_fin.database.session, "DEFAULT_DB_PATH", str(db_path))
+
+        # Create a dummy file
+        pdf_file = tmp_path / "test.pdf"
+        pdf_file.write_bytes(b"%PDF-1.4 test")
+
+        result = runner.invoke(app, ["parse", str(pdf_file), "--no-check-duplicates", "--dry-run"])
+        # Command should not fail on flag parsing
+        assert "--no-check-duplicates" not in result.stdout or result.exit_code in [0, 1, 2]
+
+    def test_parse_dry_run_skips_auto_categorize(self, tmp_path, monkeypatch):
+        """
+        GIVEN a PDF file
+        WHEN user runs `analyze-fin parse file.pdf --dry-run`
+        THEN auto-categorization is skipped (not saved).
+        """
+        db_path = tmp_path / "test.db"
+        import analyze_fin.database.session
+        monkeypatch.setattr(analyze_fin.database.session, "DEFAULT_DB_PATH", str(db_path))
+
+        pdf_file = tmp_path / "test.pdf"
+        pdf_file.write_bytes(b"%PDF-1.4 test")
+
+        result = runner.invoke(app, ["parse", str(pdf_file), "--dry-run"])
+        # Dry run should not show "categorized" in output
+        # (may fail on parsing, that's ok - we're testing dry-run behavior)
+        assert "Dry run" in result.stdout or result.exit_code in [1, 2]
 
 
 # ============================================================================

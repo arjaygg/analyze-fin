@@ -10,6 +10,8 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
+from tests.support.helpers.determinism import get_test_now
+
 # Philippine merchants for realistic test data
 # Categories aligned with analyze_fin.categorization.taxonomy
 PHILIPPINE_MERCHANTS = [
@@ -54,7 +56,7 @@ def generate_transaction(
     if date is None:
         # Random date within last 30 days
         days_ago = random.randint(0, 30)
-        date = datetime.now() - timedelta(days=days_ago)
+        date = get_test_now() - timedelta(days=days_ago)
 
     if merchant is None:
         # Pick a random merchant
@@ -154,7 +156,7 @@ def generate_statement_data(
         Statement dictionary with metadata and transactions
     """
     if year is None or month is None:
-        now = datetime.now()
+        now = get_test_now()
         if month is None:
             # Last month
             last_month = now.replace(day=1) - timedelta(days=1)

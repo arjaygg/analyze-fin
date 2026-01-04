@@ -1,9 +1,7 @@
 import random
-import uuid
-from datetime import datetime, timedelta
-from decimal import Decimal
 
 from analyze_fin.database.models import Account
+from tests.support.helpers.determinism import deterministic_uuid_hex, get_test_now
 
 def create_account(
     name: str | None = None,
@@ -14,9 +12,9 @@ def create_account(
     bank_types = ["gcash", "bpi", "maya", "maya_savings", "maya_wallet"]
     
     defaults = {
-        "name": name or f"Test Account {uuid.uuid4().hex[:8]}",
+        "name": name or f"Test Account {deterministic_uuid_hex()}",
         "bank_type": bank_type or random.choice(bank_types),
-        "created_at": datetime.now(),
+        "created_at": get_test_now(),
     }
     
     defaults.update(overrides)

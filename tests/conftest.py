@@ -14,7 +14,13 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 
-from tests.support.fixtures.files import *
+import pytest
+from sqlalchemy import create_engine, event
+from sqlalchemy.orm import Session
+
+from analyze_fin.database.models import Base
+from tests.support.fixtures import files as _files  # noqa: F401
+from tests.support.helpers.determinism import get_test_now, seed_python_random
 
 # ============================================================================
 # Database Fixtures
@@ -65,12 +71,23 @@ def db_session(in_memory_db):
 
     Each test gets a fresh session that rolls back changes.
     """
-    # Placeholder - will be implemented with SQLAlchemy
-    # session = create_session(in_memory_db)
-    # yield session
-    # session.rollback()
-    # session.close()
-    pass
+    engine = create_engine(
+        "sqlite:///:memory:",
+        echo=False,
+        connect_args={"check_same_thread": False},
+    )
+
+    @event.listens_for(engine, "connect")
+    def _set_sqlite_pragma(dbapi_connection, connection_record):  # noqa: ARG001
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
+    Base.metadata.create_all(engine)
+
+    with Session(engine) as session:
+        yield session
+        session.rollback()
 
 
 # ============================================================================
@@ -201,6 +218,16 @@ def mock_cli_args():
 # Environment Fixtures
 # ============================================================================
 
+@pytest.fixture(scope="session", autouse=True)
+def _seed_test_random() -> int:
+    """
+    Seed Python's random module once per test session for reproducibility.
+
+    Override with TEST_SEED=<int>.
+    """
+    return seed_python_random()
+
+
 @pytest.fixture(autouse=True)
 def test_env_setup(monkeypatch):
     """
@@ -242,7 +269,7 @@ class TestDataFactory:
     def create_transaction(**overrides):
         """Create a transaction with defaults and overrides."""
         defaults = {
-            "date": datetime.now(),
+            "date": get_test_now(),
             "description": "Test Transaction",
             "amount": Decimal("100.00"),
             "category": None,
@@ -255,7 +282,7 @@ class TestDataFactory:
         defaults = {
             "account_name": "Test Account",
             "bank_type": "gcash",
-            "statement_date": datetime.now(),
+            "statement_date": get_test_now(),
             "opening_balance": Decimal("1000.00"),
             "closing_balance": Decimal("900.00"),
         }
