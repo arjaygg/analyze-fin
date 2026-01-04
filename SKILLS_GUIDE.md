@@ -1,8 +1,8 @@
 # analyze-fin: Claude Skills Guide
 
-**Comprehensive documentation for all 6 Claude Skills**
+**Comprehensive documentation for all 4 Claude Skills**
 
-After Phase 5, you'll have 6 skills that form the primary interface to analyze-fin. This guide explains each skill in detail.
+After Phase 5, you'll have 4 skills that form the primary interface to analyze-fin. This guide explains each skill in detail.
 
 ---
 
@@ -10,35 +10,45 @@ After Phase 5, you'll have 6 skills that form the primary interface to analyze-f
 
 | Skill | Purpose | Command | Output |
 |-------|---------|---------|--------|
-| **parse-statements** | Import PDF statements | "Parse my GCash statement" | ✅ Imported 28 transactions |
-| **categorize-transactions** | Interactive merchant learning | "Categorize unknown merchants" | ✅ Categorized 5 merchants |
+| **parse-statements** | Import, categorize & check PDFs | "Parse my GCash statement" | ✅ Imported 28, categorized 24 (86%) |
 | **generate-report** | Create spending reports | "Generate January report" | ✅ Report saved: report.html |
 | **query-spending** | Natural language questions | "How much food?" | ₱1,250 across 12 transactions |
 | **export-data** | Export to CSV/JSON | "Export all to CSV" | ✅ Exported to data/exports/ |
-| **deduplicate** | Find duplicate transactions | "Check for duplicates" | Found 2 potential duplicates |
+
+**Note**: `categorize-transactions` and `deduplicate-transactions` are now integrated into `parse-statements` as a unified workflow. The CLI commands `analyze-fin categorize` and `analyze-fin deduplicate` remain available for manual review.
 
 ---
 
-## Skill 1: parse-statements
+## Skill 1: parse-statements (Unified Workflow)
 
-**Purpose**: Parse PDF bank statements and import transactions to local SQLite database
+**Purpose**: Parse PDF bank statements, auto-categorize transactions, and check for duplicates - all in one step
 
 **When to use**:
 - Monthly statement imports
 - Multi-account tracking (GCash, BPI, Maya)
 - Batch imports (multiple PDFs at once)
 
+### Unified Workflow
+
+The parse skill now automatically:
+1. **Parses** - Extracts transactions from PDF
+2. **Saves** - Stores in SQLite database
+3. **Categorizes** - Auto-categorizes using merchant database
+4. **Checks duplicates** - Warns about potential duplicates (non-destructive)
+
 ### Usage Examples
 
-**Example 1: Single statement**
+**Example 1: Single statement (unified workflow)**
 ```
 You: "Parse my GCash statement from January"
 Claude Code: Prompts for file path
 You: data/sample_statements/gcash_jan.pdf
 Claude Code: Prompts for password
 You: reyes4356
-Claude Code: Parses → Stores to SQLite
-Result: "✅ Imported 28 transactions, quality score: 95"
+Claude Code: Parses → Categorizes → Checks duplicates
+Result: "✅ Imported 28 transactions
+         Categorized: 24 (86%)
+         No duplicates found"
 ```
 
 **Example 2: Password-protected PDF**
@@ -73,13 +83,29 @@ Result: "✅ Imported 73 transactions total (28 GCash + 45 BPI)"
 9. **Database insert**: Stores account, statement, and transactions to SQLite
 10. **Return result**: Shows transaction count, quality score, date range
 
+### Power User Options
+
+Skip auto-behaviors with flags:
+```bash
+# Skip auto-categorization
+analyze-fin parse statement.pdf --no-auto-categorize
+
+# Skip duplicate checking
+analyze-fin parse statement.pdf --no-check-duplicates
+
+# Preview without saving
+analyze-fin parse statement.pdf --dry-run
+```
+
 ### Success Criteria
 
 ✅ Imported transactions have correct dates
 ✅ Amounts are accurate (including correct sign for debits/credits)
-✅ Merchant names preserved (normalization happens in categorize-transactions)
+✅ Merchant names auto-normalized during categorization
 ✅ Quality score >80 (indicates good extraction)
 ✅ No duplicate transactions from same statement
+✅ Categorization rate displayed (aim for >80%)
+✅ Duplicate warnings shown if any found
 
 ### Error Handling
 
@@ -90,13 +116,15 @@ Result: "✅ Imported 73 transactions total (28 GCash + 45 BPI)"
 
 ---
 
-## Skill 2: categorize-transactions
+## Skill 2 (Legacy): categorize-transactions
+
+> **Note**: This skill has been **integrated into parse-statements**. Auto-categorization now happens automatically during import. Use the CLI command `analyze-fin categorize` for manual review of uncategorized transactions.
 
 **Purpose**: Interactive merchant categorization with learning system
 
 **When to use**:
-- After first statement import (categorizes unknown merchants)
-- Monthly before generating report (ensures all merchants are categorized)
+- When categorization rate is low (<80%) after parsing
+- To review and manually categorize unknown merchants
 - When adding new merchants you haven't seen before
 
 ### Usage Examples
@@ -502,13 +530,15 @@ Naming pattern:
 
 ---
 
-## Skill 6: deduplicate
+## Skill 6 (Legacy): deduplicate
+
+> **Note**: This skill has been **integrated into parse-statements**. Duplicate checking now happens automatically during import (warnings only, non-destructive). Use the CLI command `analyze-fin deduplicate` for manual duplicate resolution.
 
 **Purpose**: Find and merge duplicate transactions (smart deduplication with user review)
 
 **When to use**:
+- When parse shows duplicate warnings
 - After importing overlapping statements
-- Monthly deduplication sweep
 - Linking internal transfers
 - Cleanup before analysis
 
@@ -596,28 +626,30 @@ Claude Code: ✅ Linked as internal transfer (won't count as duplicate spending)
 
 ## Workflow Examples
 
-### Monthly Routine
+### Monthly Routine (Simplified)
 
-**Step 1: Parse statements**
+**Step 1: Parse statements (unified workflow)**
 ```
 You: "Parse my GCash and BPI statements for January"
-Claude Code: Imports both
-Result: ✅ 28 GCash + 45 BPI = 73 total transactions
+Claude Code: Imports both → Auto-categorizes → Checks duplicates
+Result: ✅ 73 transactions imported
+        Categorized: 70 (96%)
+        Duplicate warnings: 1 internal transfer
 ```
 
-**Step 2: Check for duplicates**
+**Step 2: Review duplicates (if any)**
 ```
-You: "Check for duplicates between accounts"
-Claude Code: Finds internal transfer (GCash to BPI)
+You: "Review that duplicate"
+Claude Code: Shows the internal transfer (GCash to BPI)
 You: Confirm merge
 Result: ✅ Merged 1, final count: 72 unique transactions
 ```
 
-**Step 3: Categorize unknowns**
+**Step 3: Categorize remaining (if <80%)**
 ```
-You: "Categorize any unknown merchants"
-Claude Code: Found 2 unknown, 70 known
-You: Categorize the 2 new merchants
+You: "Categorize the unknown merchants"
+Claude Code: Found 2 unknown
+You: Categorize them
 Result: ✅ All 72 transactions categorized
 ```
 
@@ -634,6 +666,8 @@ You: "Export January to CSV"
 Claude Code: Saves to data/exports/2025-01_transactions.csv
 Result: ✅ Backed up for future reference
 ```
+
+> **Note**: With the unified workflow, Steps 1-3 often reduce to just Step 1 if categorization rate is high and no duplicates are found.
 
 ### Ad-Hoc Analysis
 
@@ -704,4 +738,6 @@ You: Copy data/exports/ to backup location
 
 ---
 
-**Master these 6 skills and you've got the complete analyze-fin system.** 🚀
+**Master these 4 skills and you've got the complete analyze-fin system.** 🚀
+
+> **Note**: The unified workflow in `parse-statements` means most imports are now single-step operations with automatic categorization and duplicate detection.

@@ -312,6 +312,16 @@ def parse(
         "--dry-run",
         help="Parse without saving to database"
     ),
+    auto_categorize: bool = typer.Option(
+        True,
+        "--auto-categorize/--no-auto-categorize",
+        help="Auto-categorize transactions after parsing (default: enabled)"
+    ),
+    check_duplicates: bool = typer.Option(
+        True,
+        "--check-duplicates/--no-check-duplicates",
+        help="Check for duplicate transactions after parsing (default: enabled)"
+    ),
 ) -> None:
     """
     Parse bank statement PDF(s) and import transactions to database.
@@ -449,6 +459,80 @@ def parse(
                     console.print(f"[green]✓[/green] Saved {saved_count} transactions to database")
                     if skipped_count > 0:
                         console.print(f"[dim]  Skipped {skipped_count} (already imported)[/dim]")
+
+                    # Unified workflow: Auto-categorize if enabled
+                    categorized_count = 0
+                    if auto_categorize and saved_count > 0:
+                        from analyze_fin.categorization.categorizer import Categorizer
+                        from analyze_fin.database.models import Transaction
+
+                        console.print("\n[bold]Auto-categorizing...[/bold]")
+                        categorizer = Categorizer()
+
+                        # Only process uncategorized transactions (Task 1.5)
+                        uncategorized = session.query(Transaction).filter(
+                            Transaction.category.is_(None)
+                        ).all()
+
+                        for tx in uncategorized:
+                            result = categorizer.categorize(tx.description)
+                            if result.category != "Uncategorized":
+                                tx.category = result.category
+                                if result.merchant_normalized:
+                                    tx.merchant_normalized = result.merchant_normalized
+                                categorized_count += 1
+
+                        session.commit()
+
+                        total_transactions = saved_count
+                        cat_pct = (categorized_count / total_transactions * 100) if total_transactions > 0 else 0
+                        console.print(f"[green]✓[/green] Categorized {categorized_count} of {total_transactions} ({cat_pct:.0f}%)")
+
+                        # Suggest manual categorization if rate < 80%
+                        if cat_pct < 80:
+                            console.print("[yellow]Tip:[/yellow] Run `analyze-fin categorize` to manually review uncategorized transactions")
+
+                    # Unified workflow: Check duplicates if enabled
+                    duplicate_count = 0
+                    if check_duplicates and saved_count > 0:
+                        from analyze_fin.database.models import Transaction
+                        from analyze_fin.dedup.detector import DuplicateDetector
+
+                        console.print("\n[bold]Checking for duplicates...[/bold]")
+
+                        # Load all transactions for duplicate check
+                        all_transactions = session.query(Transaction).all()
+                        tx_dicts = [
+                            {
+                                "id": tx.id,
+                                "date": tx.date,
+                                "description": tx.description,
+                                "amount": tx.amount,
+                                "reference_number": tx.reference_number,
+                            }
+                            for tx in all_transactions
+                        ]
+
+                        detector = DuplicateDetector()
+                        duplicates = detector.find_duplicates(tx_dicts)
+                        duplicate_count = len(duplicates)
+
+                        if duplicate_count > 0:
+                            console.print(f"[yellow]⚠[/yellow] Found {duplicate_count} potential duplicate(s)")
+                            console.print("[dim]Run `analyze-fin deduplicate --review` to resolve[/dim]")
+                        else:
+                            console.print("[green]✓[/green] No duplicates found")
+
+                    # Display unified summary (Task 2)
+                    console.print("\n[bold]📊 Import Summary[/bold]")
+                    console.print(f"  Imported: {saved_count} transactions")
+                    if auto_categorize:
+                        uncategorized_remaining = saved_count - categorized_count
+                        console.print(f"  Categorized: {categorized_count} ({categorized_count * 100 // max(saved_count, 1)}%)")
+                        if uncategorized_remaining > 0:
+                            console.print(f"  Uncategorized: {uncategorized_remaining}")
+                    if check_duplicates and duplicate_count > 0:
+                        console.print(f"  Duplicate warnings: {duplicate_count}")
 
                 except Exception as e:
                     session.rollback()
@@ -662,6 +746,12 @@ def export(
         "-c",
         help="Filter by category"
     ),
+    merchant: str | None = typer.Option(
+        None,
+        "--merchant",
+        "-m",
+        help="Filter by merchant name (case-insensitive)"
+    ),
     date_range: str | None = typer.Option(
         None,
         "--date-range",
@@ -681,13 +771,16 @@ def export(
 
         # Export filtered transactions
         analyze-fin export --category "Food & Dining" --format csv
+
+        # Export by merchant
+        analyze-fin export --merchant "Jollibee" --output jollibee.csv
     """
     from pathlib import Path
 
     from sqlalchemy.orm import Session
 
     from analyze_fin.database.session import init_db
-    from analyze_fin.queries.spending import SpendingQuery
+    from analyze_fin.export.exporter import DataExporter
 
     # Parse date range
     start_date: datetime | None = None
@@ -700,31 +793,44 @@ def export(
             console.print(f"[red]Error:[/red] {e}")
             raise typer.Exit(code=2) from None
 
-    # Initialize database and query
+    # Validate format
+    if output_format not in ("csv", "json"):
+        console.print(f"[red]Error:[/red] Invalid format '{output_format}'")
+        console.print("[dim]Valid formats: csv, json[/dim]")
+        raise typer.Exit(code=2)
+
+    # Initialize database and export using DataExporter
     try:
         engine = init_db()
         with Session(engine) as session:
-            query_builder = SpendingQuery(session)
+            exporter = DataExporter(session)
 
+            # Apply filters
             if category:
-                query_builder = query_builder.filter_by_category(category)
+                exporter.filter_by_category(category)
+            if merchant:
+                exporter.filter_by_merchant(merchant)
             if start_date or end_date:
-                query_builder = query_builder.filter_by_date_range(start_date, end_date)
+                exporter.filter_by_date_range(start_date, end_date)
 
-            transactions = query_builder.execute()
-
+            # Export to selected format
             if output_format == "csv":
-                output = _export_csv(transactions)
-            elif output_format == "json":
-                output = _export_json(transactions)
+                output = exporter.export_csv()
             else:
-                console.print(f"[red]Error:[/red] Invalid format '{output_format}'")
-                console.print("[dim]Valid formats: csv, json[/dim]")
-                raise typer.Exit(code=2)
+                output = exporter.export_json()
+
+            # Count transactions (approximate from output)
+            if output_format == "csv":
+                tx_count = output.count("\n") - 1  # Subtract header
+            else:
+                tx_count = output.count('"transaction_id"')
 
             if output_path:
                 Path(output_path).write_text(output, encoding="utf-8")
-                console.print(f"[green]✓[/green] Exported {len(transactions)} transactions to {output_path}")
+                if tx_count == 0:
+                    console.print("[yellow]No transactions match filters. Empty export created.[/yellow]")
+                else:
+                    console.print(f"[green]✓[/green] Exported {tx_count} transactions to {output_path}")
             else:
                 print(output)
 
@@ -1015,7 +1121,7 @@ def ask(
     parsed = parser.parse(question)
 
     # Show what was understood
-    console.print(f"\n[dim]Understood:[/dim]")
+    console.print("\n[dim]Understood:[/dim]")
     if parsed.category:
         console.print(f"  [cyan]Category:[/cyan] {parsed.category}")
     if parsed.merchant:

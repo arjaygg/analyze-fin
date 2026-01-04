@@ -57,46 +57,49 @@ A **statement-based personal finance tracker** for Philippine users who use mult
 
 Instead of clicking a web UI, you interact with the app via Claude Code skills:
 
-### Skill 1: `parse-statements`
+### Skill 1: `parse-statements` (Unified Workflow)
 ```
 You: "Parse my GCash statement from January"
-Claude Code: Prompts for file path → Parses PDF → Stores to SQLite
-Result: "✅ Imported 28 transactions, quality score: 95"
+Claude Code: Prompts for file path → Parses PDF → Auto-categorizes → Checks duplicates
+Result: "✅ Imported 28 transactions, categorized 24 (86%), no duplicates"
 ```
 
-### Skill 2: `categorize-transactions`
-```
-You: "Categorize my uncategorized merchants"
-Claude Code: Shows unknown merchants → You pick categories
-Result: Saves to merchant_mapping.json, updates SQLite
-```
+The parse workflow now automatically:
+- **Parses** - Extracts transactions from PDF
+- **Saves** - Stores to SQLite database
+- **Categorizes** - Auto-categorizes using merchant database
+- **Checks duplicates** - Warns about potential duplicates (non-destructive)
 
-### Skill 3: `generate-report`
+Power users can skip steps with `--no-auto-categorize` or `--no-check-duplicates`.
+
+### Skill 2: `generate-report`
 ```
 You: "Generate my January spending report"
 Claude Code: Queries SQLite → Creates HTML + Markdown
 Result: "✅ Report saved to data/reports/2025-01-report.html"
 ```
 
-### Skill 4: `query-spending`
+### Skill 3: `query-spending`
 ```
 You: "How much did I spend on food last week?"
 Claude Code: Loads SQLite data into context → Uses reasoning
 Result: "₱1,250 across 12 transactions"
 ```
 
-### Skill 5: `export-data`
+### Skill 4: `export-data`
 ```
 You: "Export all transactions to CSV"
 Claude Code: Queries SQLite → Writes to CSV
 Result: "✅ Exported 156 transactions"
 ```
 
-### Skill 6: `deduplicate`
-```
-You: "Check for duplicate transactions"
-Claude Code: Runs dedup logic → Flags suspicious pairs
-Result: "Found 2 potential duplicates, merge?"
+### CLI Commands (for power users)
+```bash
+# Manual categorization review
+analyze-fin categorize
+
+# Manual duplicate review
+analyze-fin deduplicate
 ```
 
 ---
@@ -129,12 +132,10 @@ analyze-fin/
 │   └── deduplicate.py
 │
 ├── skills/                       # Claude Skills (primary interface)
-│   ├── parse-statements/
-│   ├── categorize-transactions/
+│   ├── parse-statements/         # Unified: parse + categorize + dedup
 │   ├── generate-report/
 │   ├── query-spending/
-│   ├── export-data/
-│   └── deduplicate/
+│   └── export-data/
 │
 ├── templates/                    # HTML/Markdown templates
 │   ├── spending_report.html      # Jinja2 template for reports
