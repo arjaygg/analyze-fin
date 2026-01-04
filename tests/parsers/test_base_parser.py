@@ -238,6 +238,232 @@ class TestQualityScoreCalculation:
         assert score == 1.0
 
 
+class TestParseResultAccountFields:
+    """Test ParseResult account identifier fields (Story 5.1)."""
+
+    def test_parse_result_has_account_number_field(self):
+        """ParseResult has optional account_number field."""
+        from analyze_fin.parsers.base import ParseResult
+
+        result = ParseResult(
+            transactions=[],
+            quality_score=0.95,
+            bank_type="gcash",
+            account_number="09171234567",
+        )
+
+        assert result.account_number == "09171234567"
+
+    def test_parse_result_account_number_defaults_to_none(self):
+        """ParseResult account_number defaults to None for backwards compatibility."""
+        from analyze_fin.parsers.base import ParseResult
+
+        result = ParseResult(
+            transactions=[],
+            quality_score=0.95,
+            bank_type="gcash",
+        )
+
+        assert result.account_number is None
+
+    def test_parse_result_has_account_holder_field(self):
+        """ParseResult has optional account_holder field."""
+        from analyze_fin.parsers.base import ParseResult
+
+        result = ParseResult(
+            transactions=[],
+            quality_score=0.95,
+            bank_type="bpi",
+            account_holder="JUAN DELA CRUZ",
+        )
+
+        assert result.account_holder == "JUAN DELA CRUZ"
+
+    def test_parse_result_account_holder_defaults_to_none(self):
+        """ParseResult account_holder defaults to None for backwards compatibility."""
+        from analyze_fin.parsers.base import ParseResult
+
+        result = ParseResult(
+            transactions=[],
+            quality_score=0.95,
+            bank_type="bpi",
+        )
+
+        assert result.account_holder is None
+
+    def test_parse_result_has_period_start_field(self):
+        """ParseResult has optional period_start field."""
+        from datetime import date
+
+        from analyze_fin.parsers.base import ParseResult
+
+        result = ParseResult(
+            transactions=[],
+            quality_score=0.95,
+            bank_type="maya_savings",
+            period_start=date(2024, 11, 1),
+        )
+
+        assert result.period_start == date(2024, 11, 1)
+
+    def test_parse_result_has_period_end_field(self):
+        """ParseResult has optional period_end field."""
+        from datetime import date
+
+        from analyze_fin.parsers.base import ParseResult
+
+        result = ParseResult(
+            transactions=[],
+            quality_score=0.95,
+            bank_type="maya_savings",
+            period_end=date(2024, 11, 30),
+        )
+
+        assert result.period_end == date(2024, 11, 30)
+
+    def test_parse_result_period_dates_default_to_none(self):
+        """ParseResult period_start/period_end default to None."""
+        from analyze_fin.parsers.base import ParseResult
+
+        result = ParseResult(
+            transactions=[],
+            quality_score=0.95,
+            bank_type="gcash",
+        )
+
+        assert result.period_start is None
+        assert result.period_end is None
+
+    def test_parse_result_all_account_fields_together(self):
+        """ParseResult supports all account fields together."""
+        from datetime import date
+
+        from analyze_fin.parsers.base import ParseResult
+
+        result = ParseResult(
+            transactions=[],
+            quality_score=0.98,
+            bank_type="bpi",
+            account_number="****1234",
+            account_holder="MARIA SANTOS",
+            period_start=date(2024, 10, 1),
+            period_end=date(2024, 10, 31),
+        )
+
+        assert result.account_number == "****1234"
+        assert result.account_holder == "MARIA SANTOS"
+        assert result.period_start == date(2024, 10, 1)
+        assert result.period_end == date(2024, 10, 31)
+
+
+class TestQualityScoreAdjustment:
+    """Test quality score adjustment for missing account info (Story 5.1 AC#4)."""
+
+    def test_quality_score_reduced_when_account_number_missing(self):
+        """Quality score reduced by 0.05 when account_number is None."""
+        from pathlib import Path
+        from unittest.mock import MagicMock, patch
+
+        from analyze_fin.parsers.gcash import GCashParser
+
+        parser = GCashParser()
+
+        mock_page = MagicMock()
+        # No account info in header
+        mock_page.extract_text.return_value = "GCash Statement\nNo account info here"
+        mock_page.extract_tables.return_value = [
+            [
+                ["Date", "Description", "Ref#", "Debit", "Credit", "Balance"],
+                ["Nov 15, 2024", "JOLLIBEE", "REF1", "285.50", "", "4714.50"],
+            ]
+        ]
+
+        mock_pdf = MagicMock()
+        mock_pdf.pages = [mock_page]
+        mock_pdf.__enter__ = MagicMock(return_value=mock_pdf)
+        mock_pdf.__exit__ = MagicMock(return_value=False)
+
+        with patch("pdfplumber.open", return_value=mock_pdf):
+            result = parser.parse(Path("test.pdf"))
+
+        # Base quality score would be 1.0 (full confidence transaction)
+        # Should be reduced by 0.05 for missing account_number
+        # And 0.02 for missing period dates
+        assert result.account_number is None
+        assert result.quality_score < 1.0
+        # Score should be 1.0 - 0.05 (no account) - 0.02 (no period) = 0.93
+        assert result.quality_score == pytest.approx(0.93, abs=0.01)
+
+    def test_quality_score_reduced_when_period_dates_missing(self):
+        """Quality score reduced by 0.02 when period dates are None."""
+        from pathlib import Path
+        from unittest.mock import MagicMock, patch
+
+        from analyze_fin.parsers.gcash import GCashParser
+
+        parser = GCashParser()
+
+        mock_page = MagicMock()
+        # Has account number but no period dates
+        mock_page.extract_text.return_value = "GCash Statement\n0917 123 4567\nNo period info"
+        mock_page.extract_tables.return_value = [
+            [
+                ["Date", "Description", "Ref#", "Debit", "Credit", "Balance"],
+                ["Nov 15, 2024", "JOLLIBEE", "REF1", "285.50", "", "4714.50"],
+            ]
+        ]
+
+        mock_pdf = MagicMock()
+        mock_pdf.pages = [mock_page]
+        mock_pdf.__enter__ = MagicMock(return_value=mock_pdf)
+        mock_pdf.__exit__ = MagicMock(return_value=False)
+
+        with patch("pdfplumber.open", return_value=mock_pdf):
+            result = parser.parse(Path("test.pdf"))
+
+        assert result.account_number is not None
+        assert result.period_start is None
+        # Score should be 1.0 - 0.02 (no period) = 0.98
+        assert result.quality_score == pytest.approx(0.98, abs=0.01)
+
+    def test_quality_score_not_reduced_when_all_account_info_present(self):
+        """Quality score not reduced when all account info is present."""
+        from pathlib import Path
+        from unittest.mock import MagicMock, patch
+
+        from analyze_fin.parsers.gcash import GCashParser
+
+        parser = GCashParser()
+
+        mock_page = MagicMock()
+        # Full account info present
+        mock_page.extract_text.return_value = """
+        GCash Statement
+        Account: 0917 123 4567
+        Name: JUAN DELA CRUZ
+        Statement Period: Nov 01 - Nov 30, 2024
+        """
+        mock_page.extract_tables.return_value = [
+            [
+                ["Date", "Description", "Ref#", "Debit", "Credit", "Balance"],
+                ["Nov 15, 2024", "JOLLIBEE", "REF1", "285.50", "", "4714.50"],
+            ]
+        ]
+
+        mock_pdf = MagicMock()
+        mock_pdf.pages = [mock_page]
+        mock_pdf.__enter__ = MagicMock(return_value=mock_pdf)
+        mock_pdf.__exit__ = MagicMock(return_value=False)
+
+        with patch("pdfplumber.open", return_value=mock_pdf):
+            result = parser.parse(Path("test.pdf"))
+
+        assert result.account_number is not None
+        assert result.period_start is not None
+        # Score should be 1.0 (no reduction)
+        assert result.quality_score == 1.0
+
+
 class TestBankTypeDetection:
     """Test bank type detection method."""
 

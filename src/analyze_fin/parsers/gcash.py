@@ -8,7 +8,8 @@ GCash statement format:
 """
 
 import re
-from datetime import datetime
+import logging
+from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
@@ -16,6 +17,8 @@ import pdfplumber
 
 from analyze_fin.exceptions import ParseError
 from analyze_fin.parsers.base import BaseBankParser, ParseResult, RawTransaction
+
+logger = logging.getLogger(__name__)
 
 
 class GCashParser(BaseBankParser):
@@ -74,9 +77,20 @@ class GCashParser(BaseBankParser):
 
         transactions: list[RawTransaction] = []
         parsing_errors: list[str] = []
+        account_number = None
+        account_holder = None
+        period_start = None
+        period_end = None
 
         try:
             with pdfplumber.open(pdf_path, password=password) as pdf:
+                # Extract account info from first page
+                if pdf.pages:
+                    first_page_text = pdf.pages[0].extract_text() or ""
+                    account_number, account_holder, period_start, period_end = (
+                        self._extract_account_info(first_page_text)
+                    )
+
                 for page_num, page in enumerate(pdf.pages, start=1):
                     tables = page.extract_tables() or []
 
@@ -112,11 +126,23 @@ class GCashParser(BaseBankParser):
 
         quality_score = self.calculate_quality_score(transactions)
 
+        # Adjust quality score for missing account info (Story 5.1 AC#4)
+        if account_number is None:
+            quality_score = max(0.0, quality_score - 0.05)
+            logger.warning("GCash: Could not extract account number from statement")
+        if period_start is None or period_end is None:
+            quality_score = max(0.0, quality_score - 0.02)
+            logger.warning("GCash: Could not extract statement period dates")
+
         return ParseResult(
             transactions=transactions,
             quality_score=quality_score,
             bank_type="gcash",
             parsing_errors=parsing_errors,
+            account_number=account_number,
+            account_holder=account_holder,
+            period_start=period_start,
+            period_end=period_end,
         )
 
     def _extract_transaction_from_row(self, row: list) -> RawTransaction | None:
@@ -240,3 +266,54 @@ class GCashParser(BaseBankParser):
             return amount
         except InvalidOperation as e:
             raise ValueError(f"Cannot parse amount '{amount_str}': {e}") from e
+
+    def _extract_account_info(
+        self, text: str
+    ) -> tuple[str | None, str | None, date | None, date | None]:
+        """Extract account info from PDF header text.
+
+        Args:
+            text: Full text from PDF first page
+
+        Returns:
+            Tuple of (account_number, account_holder, period_start, period_end)
+            Any field may be None if not found.
+        """
+        account_number = None
+        account_holder = None
+        period_start = None
+        period_end = None
+
+        # Extract mobile number - Philippine format: 09XX XXX XXXX or variations
+        # Patterns: "0917 123 4567", "09171234567", "0917-123-4567"
+        mobile_pattern = r"09\d{2}[\s\-]?\d{3}[\s\-]?\d{4}"
+        mobile_match = re.search(mobile_pattern, text)
+        if mobile_match:
+            # Normalize to 11 digits without spaces/dashes
+            raw_number = mobile_match.group()
+            account_number = re.sub(r"[\s\-]", "", raw_number)
+
+        # Extract account holder name - look for "Name:" followed by text
+        name_pattern = r"Name:\s*([A-Z][A-Z\s]+?)(?:\n|$)"
+        name_match = re.search(name_pattern, text, re.IGNORECASE)
+        if name_match:
+            account_holder = name_match.group(1).strip()
+
+        # Extract statement period - format: "Statement Period: Nov 01 - Nov 30, 2024"
+        period_pattern = r"Statement\s*Period:\s*([A-Za-z]{3})\s+(\d{1,2})\s*-\s*([A-Za-z]{3})\s+(\d{1,2}),?\s*(\d{4})"
+        period_match = re.search(period_pattern, text, re.IGNORECASE)
+        if period_match:
+            start_month_str, start_day, end_month_str, end_day, year = (
+                period_match.groups()
+            )
+            start_month = self.MONTH_MAP.get(start_month_str.lower())
+            end_month = self.MONTH_MAP.get(end_month_str.lower())
+
+            if start_month and end_month:
+                try:
+                    period_start = date(int(year), start_month, int(start_day))
+                    period_end = date(int(year), end_month, int(end_day))
+                except ValueError as e:
+                    logger.warning(f"Invalid statement period dates: {e}")
+
+        return account_number, account_holder, period_start, period_end

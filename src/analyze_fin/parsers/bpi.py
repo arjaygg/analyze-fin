@@ -8,7 +8,8 @@ BPI (Bank of the Philippine Islands) statement format:
 """
 
 import re
-from datetime import datetime
+import logging
+from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
@@ -16,6 +17,18 @@ import pdfplumber
 
 from analyze_fin.exceptions import ParseError
 from analyze_fin.parsers.base import BaseBankParser, ParseResult, RawTransaction
+
+logger = logging.getLogger(__name__)
+
+# Month name to number mapping
+MONTH_MAP = {
+    "january": 1, "february": 2, "march": 3, "april": 4,
+    "may": 5, "june": 6, "july": 7, "august": 8,
+    "september": 9, "october": 10, "november": 11, "december": 12,
+    "jan": 1, "feb": 2, "mar": 3, "apr": 4,
+    "jun": 6, "jul": 7, "aug": 8,
+    "sep": 9, "oct": 10, "nov": 11, "dec": 12,
+}
 
 
 class BPIParser(BaseBankParser):
@@ -71,9 +84,20 @@ class BPIParser(BaseBankParser):
 
         transactions: list[RawTransaction] = []
         parsing_errors: list[str] = []
+        account_number = None
+        account_holder = None
+        period_start = None
+        period_end = None
 
         try:
             with pdfplumber.open(pdf_path, password=password) as pdf:
+                # Extract account info from first page
+                if pdf.pages:
+                    first_page_text = pdf.pages[0].extract_text() or ""
+                    account_number, account_holder, period_start, period_end = (
+                        self._extract_account_info(first_page_text)
+                    )
+
                 # Try table extraction first (standard format)
                 for page_num, page in enumerate(pdf.pages, start=1):
                     tables = page.extract_tables() or []
@@ -126,11 +150,23 @@ class BPIParser(BaseBankParser):
 
         quality_score = self.calculate_quality_score(transactions)
 
+        # Adjust quality score for missing account info (Story 5.1 AC#4)
+        if account_number is None:
+            quality_score = max(0.0, quality_score - 0.05)
+            logger.warning("BPI: Could not extract account number from statement")
+        if period_start is None or period_end is None:
+            quality_score = max(0.0, quality_score - 0.02)
+            logger.warning("BPI: Could not extract statement period dates")
+
         return ParseResult(
             transactions=transactions,
             quality_score=quality_score,
             bank_type="bpi",
             parsing_errors=parsing_errors,
+            account_number=account_number,
+            account_holder=account_holder,
+            period_start=period_start,
+            period_end=period_end,
         )
 
     def _extract_transaction_from_row(self, row: list) -> RawTransaction | None:
@@ -348,3 +384,57 @@ class BPIParser(BaseBankParser):
             return amount
         except InvalidOperation as e:
             raise ValueError(f"Cannot parse amount '{amount_str}': {e}") from e
+
+    def _extract_account_info(
+        self, text: str
+    ) -> tuple[str | None, str | None, date | None, date | None]:
+        """Extract account info from PDF header text.
+
+        Args:
+            text: Full text from PDF first page
+
+        Returns:
+            Tuple of (account_number, account_holder, period_start, period_end)
+            Any field may be None if not found.
+            Account number is masked to show only last 4 digits.
+        """
+        account_number = None
+        account_holder = None
+        period_start = None
+        period_end = None
+
+        # Extract account number - various BPI formats
+        # Patterns: "Account Number: 1234-5678-9012", "Account No: 123456789012", "Acct No.: 1234 5678 9012"
+        acct_pattern = r"(?:Account\s*(?:Number|No\.?)|Acct\s*No\.?)[\s:]*(\d[\d\s\-]+\d)"
+        acct_match = re.search(acct_pattern, text, re.IGNORECASE)
+        if acct_match:
+            # Extract digits only and mask all but last 4
+            raw_number = re.sub(r"[\s\-]", "", acct_match.group(1))
+            if len(raw_number) >= 4:
+                account_number = f"****{raw_number[-4:]}"
+
+        # Extract account holder name - look for "Account Name:" followed by text
+        name_pattern = r"Account\s*Name:\s*([A-Z][A-Z\s]+?)(?:\n|$)"
+        name_match = re.search(name_pattern, text, re.IGNORECASE)
+        if name_match:
+            account_holder = name_match.group(1).strip()
+
+        # Extract statement period - format: "Statement Period: November 01, 2024 - November 30, 2024"
+        # or "PERIOD COVERED: ..."
+        period_pattern = r"(?:Statement\s*Period|PERIOD\s*COVERED)[\s:]*([A-Za-z]+)\s+(\d{1,2}),?\s*(\d{4})\s*[-–]\s*([A-Za-z]+)\s+(\d{1,2}),?\s*(\d{4})"
+        period_match = re.search(period_pattern, text, re.IGNORECASE)
+        if period_match:
+            start_month_str, start_day, start_year, end_month_str, end_day, end_year = (
+                period_match.groups()
+            )
+            start_month = MONTH_MAP.get(start_month_str.lower())
+            end_month = MONTH_MAP.get(end_month_str.lower())
+
+            if start_month and end_month:
+                try:
+                    period_start = date(int(start_year), start_month, int(start_day))
+                    period_end = date(int(end_year), end_month, int(end_day))
+                except ValueError as e:
+                    logger.warning(f"Invalid statement period dates: {e}")
+
+        return account_number, account_holder, period_start, period_end

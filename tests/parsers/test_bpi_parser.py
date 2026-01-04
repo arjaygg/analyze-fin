@@ -263,6 +263,178 @@ class TestBPIParseMethod:
         assert 0.0 <= result.quality_score <= 1.0
 
 
+class TestBPIAccountInfoExtraction:
+    """Test BPI account identifier extraction (Story 5.1)."""
+
+    def test_extract_account_number_masked(self):
+        """Extract and mask account number from BPI statement header."""
+        from analyze_fin.parsers.bpi import BPIParser
+
+        parser = BPIParser()
+
+        mock_page = MagicMock()
+        mock_page.extract_text.return_value = """
+        Bank of the Philippine Islands
+        SAVINGS ACCOUNT
+        Account Number: 1234-5678-9012
+        Account Name: JUAN DELA CRUZ
+        Statement Period: November 01, 2024 - November 30, 2024
+        """
+        mock_page.extract_tables.return_value = [
+            [
+                ["Date", "Description", "Debit", "Credit", "Balance"],
+                ["11/15/2024", "ATM WITHDRAWAL", "500.00", "", "9500.00"],
+            ]
+        ]
+
+        mock_pdf = MagicMock()
+        mock_pdf.pages = [mock_page]
+        mock_pdf.__enter__ = MagicMock(return_value=mock_pdf)
+        mock_pdf.__exit__ = MagicMock(return_value=False)
+
+        with patch("pdfplumber.open", return_value=mock_pdf):
+            result = parser.parse(Path("test.pdf"))
+
+        # Account number should be masked to show only last 4 digits
+        assert result.account_number == "****9012"
+
+    def test_extract_account_holder_name(self):
+        """Extract account holder name from BPI statement."""
+        from analyze_fin.parsers.bpi import BPIParser
+
+        parser = BPIParser()
+
+        mock_page = MagicMock()
+        mock_page.extract_text.return_value = """
+        Bank of the Philippine Islands
+        Account Number: 1234-5678-9012
+        Account Name: MARIA SANTOS
+        Statement Period: November 01, 2024 - November 30, 2024
+        """
+        mock_page.extract_tables.return_value = [
+            [
+                ["Date", "Description", "Debit", "Credit", "Balance"],
+                ["11/15/2024", "ATM WITHDRAWAL", "500.00", "", "9500.00"],
+            ]
+        ]
+
+        mock_pdf = MagicMock()
+        mock_pdf.pages = [mock_page]
+        mock_pdf.__enter__ = MagicMock(return_value=mock_pdf)
+        mock_pdf.__exit__ = MagicMock(return_value=False)
+
+        with patch("pdfplumber.open", return_value=mock_pdf):
+            result = parser.parse(Path("test.pdf"))
+
+        assert result.account_holder == "MARIA SANTOS"
+
+    def test_extract_statement_period_dates(self):
+        """Extract statement period start and end dates."""
+        from datetime import date
+
+        from analyze_fin.parsers.bpi import BPIParser
+
+        parser = BPIParser()
+
+        mock_page = MagicMock()
+        mock_page.extract_text.return_value = """
+        Bank of the Philippine Islands
+        Account Number: 1234-5678-9012
+        Account Name: JUAN DELA CRUZ
+        Statement Period: November 01, 2024 - November 30, 2024
+        """
+        mock_page.extract_tables.return_value = [
+            [
+                ["Date", "Description", "Debit", "Credit", "Balance"],
+                ["11/15/2024", "ATM WITHDRAWAL", "500.00", "", "9500.00"],
+            ]
+        ]
+
+        mock_pdf = MagicMock()
+        mock_pdf.pages = [mock_page]
+        mock_pdf.__enter__ = MagicMock(return_value=mock_pdf)
+        mock_pdf.__exit__ = MagicMock(return_value=False)
+
+        with patch("pdfplumber.open", return_value=mock_pdf):
+            result = parser.parse(Path("test.pdf"))
+
+        assert result.period_start == date(2024, 11, 1)
+        assert result.period_end == date(2024, 11, 30)
+
+    def test_account_info_missing_returns_none(self):
+        """Missing account info returns None (backwards compatible)."""
+        from analyze_fin.parsers.bpi import BPIParser
+
+        parser = BPIParser()
+
+        mock_page = MagicMock()
+        mock_page.extract_text.return_value = """
+        Bank of the Philippine Islands
+        Some other content without account info
+        """
+        mock_page.extract_tables.return_value = [
+            [
+                ["Date", "Description", "Debit", "Credit", "Balance"],
+                ["11/15/2024", "ATM WITHDRAWAL", "500.00", "", "9500.00"],
+            ]
+        ]
+
+        mock_pdf = MagicMock()
+        mock_pdf.pages = [mock_page]
+        mock_pdf.__enter__ = MagicMock(return_value=mock_pdf)
+        mock_pdf.__exit__ = MagicMock(return_value=False)
+
+        with patch("pdfplumber.open", return_value=mock_pdf):
+            result = parser.parse(Path("test.pdf"))
+
+        # Missing account info should be None, not fail
+        assert result.account_number is None
+        assert result.account_holder is None
+        assert result.period_start is None
+        assert result.period_end is None
+
+    def test_extract_account_info_method_exists(self):
+        """BPIParser has _extract_account_info method."""
+        from analyze_fin.parsers.bpi import BPIParser
+
+        parser = BPIParser()
+        assert hasattr(parser, "_extract_account_info")
+        assert callable(parser._extract_account_info)
+
+    def test_account_number_various_formats(self):
+        """Handle various account number formats."""
+        from analyze_fin.parsers.bpi import BPIParser
+
+        parser = BPIParser()
+
+        # Test with different formats
+        test_cases = [
+            ("Account Number: 1234-5678-9012", "****9012"),
+            ("Account No: 123456789012", "****9012"),
+            ("Acct No.: 1234 5678 9012", "****9012"),
+        ]
+
+        for header_text, expected in test_cases:
+            mock_page = MagicMock()
+            mock_page.extract_text.return_value = f"BPI Statement\n{header_text}\n"
+            mock_page.extract_tables.return_value = [
+                [
+                    ["Date", "Description", "Debit", "Credit", "Balance"],
+                    ["11/15/2024", "TEST", "100.00", "", "1000.00"],
+                ]
+            ]
+
+            mock_pdf = MagicMock()
+            mock_pdf.pages = [mock_page]
+            mock_pdf.__enter__ = MagicMock(return_value=mock_pdf)
+            mock_pdf.__exit__ = MagicMock(return_value=False)
+
+            with patch("pdfplumber.open", return_value=mock_pdf):
+                result = parser.parse(Path("test.pdf"))
+
+            assert result.account_number == expected, f"Failed for: {header_text}"
+
+
 class TestBPISecurityRequirements:
     """Test that password is handled securely."""
 

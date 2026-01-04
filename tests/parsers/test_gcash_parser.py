@@ -306,6 +306,177 @@ class TestGCashMultiPageHandling:
         assert len(result.transactions) == 2
 
 
+class TestGCashAccountInfoExtraction:
+    """Test GCash account identifier extraction (Story 5.1)."""
+
+    def test_extract_mobile_number_from_header(self):
+        """Extract mobile number from GCash statement header."""
+        from analyze_fin.parsers.gcash import GCashParser
+
+        parser = GCashParser()
+
+        mock_page = MagicMock()
+        mock_page.extract_text.return_value = """
+        GCash Statement
+        Account: 0917 123 4567
+        Name: JUAN DELA CRUZ
+        Statement Period: Nov 01 - Nov 30, 2024
+        """
+        mock_page.extract_tables.return_value = [
+            [
+                ["Date", "Description", "Ref#", "Debit", "Credit", "Balance"],
+                ["Nov 15, 2024", "JOLLIBEE", "REF1", "285.50", "", "4714.50"],
+            ]
+        ]
+
+        mock_pdf = MagicMock()
+        mock_pdf.pages = [mock_page]
+        mock_pdf.__enter__ = MagicMock(return_value=mock_pdf)
+        mock_pdf.__exit__ = MagicMock(return_value=False)
+
+        with patch("pdfplumber.open", return_value=mock_pdf):
+            result = parser.parse(Path("test.pdf"))
+
+        assert result.account_number == "09171234567"
+
+    def test_extract_account_holder_name(self):
+        """Extract account holder name from GCash statement."""
+        from analyze_fin.parsers.gcash import GCashParser
+
+        parser = GCashParser()
+
+        mock_page = MagicMock()
+        mock_page.extract_text.return_value = """
+        GCash Statement
+        Account: 0917 123 4567
+        Name: MARIA SANTOS
+        Statement Period: Nov 01 - Nov 30, 2024
+        """
+        mock_page.extract_tables.return_value = [
+            [
+                ["Date", "Description", "Ref#", "Debit", "Credit", "Balance"],
+                ["Nov 15, 2024", "JOLLIBEE", "REF1", "285.50", "", "4714.50"],
+            ]
+        ]
+
+        mock_pdf = MagicMock()
+        mock_pdf.pages = [mock_page]
+        mock_pdf.__enter__ = MagicMock(return_value=mock_pdf)
+        mock_pdf.__exit__ = MagicMock(return_value=False)
+
+        with patch("pdfplumber.open", return_value=mock_pdf):
+            result = parser.parse(Path("test.pdf"))
+
+        assert result.account_holder == "MARIA SANTOS"
+
+    def test_extract_statement_period_dates(self):
+        """Extract statement period start and end dates."""
+        from datetime import date
+
+        from analyze_fin.parsers.gcash import GCashParser
+
+        parser = GCashParser()
+
+        mock_page = MagicMock()
+        mock_page.extract_text.return_value = """
+        GCash Statement
+        Account: 0917 123 4567
+        Name: JUAN DELA CRUZ
+        Statement Period: Nov 01 - Nov 30, 2024
+        """
+        mock_page.extract_tables.return_value = [
+            [
+                ["Date", "Description", "Ref#", "Debit", "Credit", "Balance"],
+                ["Nov 15, 2024", "JOLLIBEE", "REF1", "285.50", "", "4714.50"],
+            ]
+        ]
+
+        mock_pdf = MagicMock()
+        mock_pdf.pages = [mock_page]
+        mock_pdf.__enter__ = MagicMock(return_value=mock_pdf)
+        mock_pdf.__exit__ = MagicMock(return_value=False)
+
+        with patch("pdfplumber.open", return_value=mock_pdf):
+            result = parser.parse(Path("test.pdf"))
+
+        assert result.period_start == date(2024, 11, 1)
+        assert result.period_end == date(2024, 11, 30)
+
+    def test_account_info_missing_returns_none(self):
+        """Missing account info returns None (backwards compatible)."""
+        from analyze_fin.parsers.gcash import GCashParser
+
+        parser = GCashParser()
+
+        mock_page = MagicMock()
+        mock_page.extract_text.return_value = """
+        GCash Statement
+        Some other content without account info
+        """
+        mock_page.extract_tables.return_value = [
+            [
+                ["Date", "Description", "Ref#", "Debit", "Credit", "Balance"],
+                ["Nov 15, 2024", "JOLLIBEE", "REF1", "285.50", "", "4714.50"],
+            ]
+        ]
+
+        mock_pdf = MagicMock()
+        mock_pdf.pages = [mock_page]
+        mock_pdf.__enter__ = MagicMock(return_value=mock_pdf)
+        mock_pdf.__exit__ = MagicMock(return_value=False)
+
+        with patch("pdfplumber.open", return_value=mock_pdf):
+            result = parser.parse(Path("test.pdf"))
+
+        # Missing account info should be None, not fail
+        assert result.account_number is None
+        assert result.account_holder is None
+        assert result.period_start is None
+        assert result.period_end is None
+
+    def test_extract_account_info_method_exists(self):
+        """GCashParser has _extract_account_info method."""
+        from analyze_fin.parsers.gcash import GCashParser
+
+        parser = GCashParser()
+        assert hasattr(parser, "_extract_account_info")
+        assert callable(parser._extract_account_info)
+
+    def test_mobile_number_variations(self):
+        """Handle various mobile number formats."""
+        from analyze_fin.parsers.gcash import GCashParser
+
+        parser = GCashParser()
+
+        # Test with different number formats
+        test_cases = [
+            ("Account: 0917 123 4567", "09171234567"),
+            ("Mobile: 09171234567", "09171234567"),
+            ("GCash Number: 0917-123-4567", "09171234567"),
+            ("0918 987 6543", "09189876543"),
+        ]
+
+        for header_text, expected in test_cases:
+            mock_page = MagicMock()
+            mock_page.extract_text.return_value = f"GCash Statement\n{header_text}\n"
+            mock_page.extract_tables.return_value = [
+                [
+                    ["Date", "Description", "Ref#", "Debit", "Credit", "Balance"],
+                    ["Nov 15, 2024", "TEST", "REF1", "100.00", "", "1000.00"],
+                ]
+            ]
+
+            mock_pdf = MagicMock()
+            mock_pdf.pages = [mock_page]
+            mock_pdf.__enter__ = MagicMock(return_value=mock_pdf)
+            mock_pdf.__exit__ = MagicMock(return_value=False)
+
+            with patch("pdfplumber.open", return_value=mock_pdf):
+                result = parser.parse(Path("test.pdf"))
+
+            assert result.account_number == expected, f"Failed for: {header_text}"
+
+
 class TestGCashParserErrorHandling:
     """Test error handling in GCash parser."""
 

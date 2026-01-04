@@ -251,3 +251,173 @@ class TestMayaParseMethod:
         with patch("pdfplumber.open", side_effect=Exception("PDF error")):
             with pytest.raises(ParseError):
                 parser.parse(Path("invalid.pdf"))
+
+
+class TestMayaAccountInfoExtraction:
+    """Test Maya account identifier extraction (Story 5.1)."""
+
+    def test_extract_account_number_from_header(self):
+        """Extract account number from Maya statement header."""
+        from analyze_fin.parsers.maya import MayaParser
+
+        parser = MayaParser()
+
+        mock_page = MagicMock()
+        mock_page.extract_text.return_value = """
+        Maya Savings Account
+        Account Number: 1234567890
+        Account Holder: JUAN DELA CRUZ
+        Statement Period: November 01, 2024 - November 30, 2024
+        """
+        mock_page.extract_tables.return_value = [
+            [
+                ["Date", "Description", "Amount", "Balance"],
+                ["2024-11-15", "Cash In", "1000.00", "5000.00"],
+            ]
+        ]
+
+        mock_pdf = MagicMock()
+        mock_pdf.pages = [mock_page]
+        mock_pdf.__enter__ = MagicMock(return_value=mock_pdf)
+        mock_pdf.__exit__ = MagicMock(return_value=False)
+
+        with patch("pdfplumber.open", return_value=mock_pdf):
+            result = parser.parse(Path("test.pdf"))
+
+        assert result.account_number == "1234567890"
+
+    def test_extract_account_holder_name(self):
+        """Extract account holder name from Maya statement."""
+        from analyze_fin.parsers.maya import MayaParser
+
+        parser = MayaParser()
+
+        mock_page = MagicMock()
+        mock_page.extract_text.return_value = """
+        Maya Wallet
+        Account Number: 1234567890
+        Account Holder: MARIA SANTOS
+        Statement Period: November 01, 2024 - November 30, 2024
+        """
+        mock_page.extract_tables.return_value = [
+            [
+                ["Date", "Description", "Amount", "Balance"],
+                ["2024-11-15", "Cash In", "1000.00", "5000.00"],
+            ]
+        ]
+
+        mock_pdf = MagicMock()
+        mock_pdf.pages = [mock_page]
+        mock_pdf.__enter__ = MagicMock(return_value=mock_pdf)
+        mock_pdf.__exit__ = MagicMock(return_value=False)
+
+        with patch("pdfplumber.open", return_value=mock_pdf):
+            result = parser.parse(Path("test.pdf"))
+
+        assert result.account_holder == "MARIA SANTOS"
+
+    def test_extract_statement_period_dates(self):
+        """Extract statement period start and end dates."""
+        from datetime import date
+
+        from analyze_fin.parsers.maya import MayaParser
+
+        parser = MayaParser()
+
+        mock_page = MagicMock()
+        mock_page.extract_text.return_value = """
+        Maya Savings Account
+        Account Number: 1234567890
+        Account Holder: JUAN DELA CRUZ
+        Statement Period: November 01, 2024 - November 30, 2024
+        """
+        mock_page.extract_tables.return_value = [
+            [
+                ["Date", "Description", "Amount", "Balance"],
+                ["2024-11-15", "Cash In", "1000.00", "5000.00"],
+            ]
+        ]
+
+        mock_pdf = MagicMock()
+        mock_pdf.pages = [mock_page]
+        mock_pdf.__enter__ = MagicMock(return_value=mock_pdf)
+        mock_pdf.__exit__ = MagicMock(return_value=False)
+
+        with patch("pdfplumber.open", return_value=mock_pdf):
+            result = parser.parse(Path("test.pdf"))
+
+        assert result.period_start == date(2024, 11, 1)
+        assert result.period_end == date(2024, 11, 30)
+
+    def test_account_info_missing_returns_none(self):
+        """Missing account info returns None (backwards compatible)."""
+        from analyze_fin.parsers.maya import MayaParser
+
+        parser = MayaParser()
+
+        mock_page = MagicMock()
+        mock_page.extract_text.return_value = """
+        Maya Statement
+        Some other content without account info
+        """
+        mock_page.extract_tables.return_value = [
+            [
+                ["Date", "Description", "Amount", "Balance"],
+                ["2024-11-15", "Cash In", "1000.00", "5000.00"],
+            ]
+        ]
+
+        mock_pdf = MagicMock()
+        mock_pdf.pages = [mock_page]
+        mock_pdf.__enter__ = MagicMock(return_value=mock_pdf)
+        mock_pdf.__exit__ = MagicMock(return_value=False)
+
+        with patch("pdfplumber.open", return_value=mock_pdf):
+            result = parser.parse(Path("test.pdf"))
+
+        # Missing account info should be None, not fail
+        assert result.account_number is None
+        assert result.account_holder is None
+        assert result.period_start is None
+        assert result.period_end is None
+
+    def test_extract_account_info_method_exists(self):
+        """MayaParser has _extract_account_info method."""
+        from analyze_fin.parsers.maya import MayaParser
+
+        parser = MayaParser()
+        assert hasattr(parser, "_extract_account_info")
+        assert callable(parser._extract_account_info)
+
+    def test_account_number_various_formats(self):
+        """Handle various account number formats."""
+        from analyze_fin.parsers.maya import MayaParser
+
+        parser = MayaParser()
+
+        # Test with different formats
+        test_cases = [
+            ("Account Number: 1234567890", "1234567890"),
+            ("Account No: 1234567890", "1234567890"),
+            ("Account ID: 1234567890", "1234567890"),
+        ]
+
+        for header_text, expected in test_cases:
+            mock_page = MagicMock()
+            mock_page.extract_text.return_value = f"Maya Savings\n{header_text}\n"
+            mock_page.extract_tables.return_value = [
+                [
+                    ["Date", "Description", "Amount", "Balance"],
+                    ["2024-11-15", "TEST", "100.00", "1000.00"],
+                ]
+            ]
+
+            mock_pdf = MagicMock()
+            mock_pdf.pages = [mock_page]
+            mock_pdf.__enter__ = MagicMock(return_value=mock_pdf)
+            mock_pdf.__exit__ = MagicMock(return_value=False)
+
+            with patch("pdfplumber.open", return_value=mock_pdf):
+                result = parser.parse(Path("test.pdf"))
+
+            assert result.account_number == expected, f"Failed for: {header_text}"

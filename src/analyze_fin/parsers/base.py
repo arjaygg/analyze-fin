@@ -14,7 +14,7 @@ Supported banks:
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
 
@@ -52,6 +52,12 @@ class ParseResult:
     closing_balance: Decimal | None = None
     statement_date: datetime | None = None
     parsing_errors: list[str] = field(default_factory=list)
+
+    # Account identification fields (Story 5.1)
+    account_number: str | None = None  # Bank account number or mobile number
+    account_holder: str | None = None  # Account holder name
+    period_start: date | None = None  # Statement period start date
+    period_end: date | None = None  # Statement period end date
 
 
 class BaseBankParser(ABC):
