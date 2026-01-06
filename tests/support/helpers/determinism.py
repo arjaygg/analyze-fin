@@ -5,7 +5,6 @@ import random
 import uuid
 from datetime import datetime
 
-
 DEFAULT_TEST_SEED = 0
 # Chosen to align with existing fixture dates in the repo; keep as naive datetime.
 DEFAULT_TEST_NOW = datetime(2024, 11, 30, 0, 0, 0)

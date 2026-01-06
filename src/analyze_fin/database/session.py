@@ -11,30 +11,67 @@ SQLite Configuration:
 - Foreign key constraints enforced
 """
 
+from __future__ import annotations
+
 from collections.abc import Generator
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 
 from analyze_fin.database.models import Base
 
-# Default database path
+if TYPE_CHECKING:
+    from analyze_fin.config import ConfigManager
+
+# Default database path (legacy, prefer config system)
 DEFAULT_DB_PATH = "data/analyze-fin.db"
+
+# Global config reference (set by CLI callback)
+_config: ConfigManager | None = None
+
+
+def set_config(config: ConfigManager) -> None:
+    """Set the global config manager for database operations.
+
+    Called by CLI callback to inject configuration.
+
+    Args:
+        config: ConfigManager instance to use for database path.
+    """
+    global _config
+    _config = config
+
+
+def get_database_path(cli_override: str | None = None) -> str:
+    """Get database path from config or default.
+
+    Args:
+        cli_override: CLI-provided path override.
+
+    Returns:
+        Database path string.
+    """
+    if cli_override:
+        return cli_override
+    if _config:
+        return str(_config.get_database_path())
+    return DEFAULT_DB_PATH
 
 
 def get_engine(db_path: str | None = None, echo: bool = False) -> Engine:
     """Create SQLAlchemy engine with WAL mode enabled.
 
     Args:
-        db_path: Path to SQLite database file. Defaults to DEFAULT_DB_PATH.
+        db_path: Path to SQLite database file. Defaults to config or DEFAULT_DB_PATH.
         echo: If True, log all SQL statements.
 
     Returns:
         Configured SQLAlchemy Engine with WAL mode and foreign keys enabled.
     """
     if db_path is None:
-        db_path = DEFAULT_DB_PATH
+        db_path = get_database_path()
 
     # Ensure parent directory exists
     db_file = Path(db_path)

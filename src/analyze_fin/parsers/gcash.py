@@ -7,8 +7,8 @@ GCash statement format:
 - Table columns: Date | Description | Reference | Debit | Credit | Balance
 """
 
-import re
 import logging
+import re
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path

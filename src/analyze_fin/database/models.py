@@ -13,7 +13,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, ForeignKey, Index, Numeric, String, func
+from sqlalchemy import Boolean, ForeignKey, Index, Numeric, String, UniqueConstraint, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 if TYPE_CHECKING:
@@ -31,6 +31,11 @@ class Account(Base):
 
     Represents a user's bank account (GCash, BPI, Maya, etc.).
     Each account can have multiple statements imported.
+
+    Multi-account support (Story 5.2):
+    - account_number: Bank account number or mobile number for identification
+    - account_holder: Account holder name
+    - Composite unique constraint on (bank_type, account_number)
     """
 
     __tablename__ = "accounts"
@@ -38,7 +43,15 @@ class Account(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(100))
     bank_type: Mapped[str] = mapped_column(String(50))  # gcash, bpi, maya, maya_savings, maya_wallet
+    account_number: Mapped[str | None] = mapped_column(String(50), nullable=True)  # e.g., "09171234567" or "****1234"
+    account_holder: Mapped[str | None] = mapped_column(String(200), nullable=True)  # e.g., "Juan dela Cruz"
     created_at: Mapped[datetime] = mapped_column(default=func.now())
+
+    # Composite unique constraint: (bank_type, account_number)
+    # SQLite allows multiple NULL values in unique constraints
+    __table_args__ = (
+        UniqueConstraint("bank_type", "account_number", name="uq_bank_account"),
+    )
 
     # Relationships
     statements: Mapped[list["Statement"]] = relationship(
@@ -48,7 +61,8 @@ class Account(Base):
     )
 
     def __repr__(self) -> str:
-        return f"<Account(id={self.id}, name='{self.name}', bank_type='{self.bank_type}')>"
+        acct_num = f", account_number='{self.account_number}'" if self.account_number else ""
+        return f"<Account(id={self.id}, name='{self.name}', bank_type='{self.bank_type}'{acct_num})>"
 
 
 class Statement(Base):

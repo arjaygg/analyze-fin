@@ -8,6 +8,7 @@ This module provides reusable fixtures for:
 - CLI testing
 """
 
+import os
 import tempfile
 from collections.abc import Generator
 from datetime import datetime, timedelta
@@ -21,6 +22,32 @@ from sqlalchemy.orm import Session
 from analyze_fin.database.models import Base
 from tests.support.fixtures import files as _files  # noqa: F401
 from tests.support.helpers.determinism import get_test_now, seed_python_random
+
+# ============================================================================
+# Pytest options / global collection behavior
+# ============================================================================
+
+
+def pytest_addoption(parser: pytest.Parser) -> None:
+    parser.addoption(
+        "--run-real-pdf",
+        action="store_true",
+        default=False,
+        help="Run tests marked @pytest.mark.real_pdf (may require sample PDFs and external parsing deps).",
+    )
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    run_real_pdf = bool(config.getoption("--run-real-pdf")) or os.environ.get("RUN_REAL_PDF_E2E") == "1"
+    if run_real_pdf:
+        return
+
+    skip_real_pdf = pytest.mark.skip(
+        reason="Opt-in required for real PDF tests (use --run-real-pdf or set RUN_REAL_PDF_E2E=1)."
+    )
+    for item in items:
+        if item.get_closest_marker("real_pdf") is not None:
+            item.add_marker(skip_real_pdf)
 
 # ============================================================================
 # Database Fixtures

@@ -4,6 +4,7 @@ from decimal import Decimal
 from analyze_fin.database.models import Statement
 from tests.support.helpers.determinism import deterministic_uuid_hex, get_test_now
 
+
 def create_statement(
     account_id: int | None = None,
     file_path: str | None = None,
@@ -16,7 +17,7 @@ def create_statement(
         "imported_at": get_test_now(),
         "quality_score": Decimal(f"{random.uniform(0.5, 1.0):.2f}"),
     }
-    
+
     defaults.update(overrides)
     return Statement(**defaults)
 

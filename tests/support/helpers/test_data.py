@@ -30,7 +30,7 @@ PHILIPPINE_MERCHANTS = [
 ]
 
 # Create lookup dict for merchant -> category
-MERCHANT_TO_CATEGORY = {name: cat for name, cat in PHILIPPINE_MERCHANTS}
+MERCHANT_TO_CATEGORY = dict(PHILIPPINE_MERCHANTS)
 
 
 def generate_transaction(

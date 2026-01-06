@@ -15,16 +15,13 @@ Output:
     tests/fixtures/sample_statements/sample_maya_savings.pdf
 """
 
-from pathlib import Path
-from datetime import datetime, timedelta
-from decimal import Decimal
 import sys
+from pathlib import Path
 
 try:
-    from reportlab.lib.pagesizes import letter, A4
+    from reportlab.lib.pagesizes import A4, letter
     from reportlab.lib.units import inch
     from reportlab.pdfgen import canvas
-    from reportlab.lib import colors
 except ImportError:
     print("Error: reportlab not installed")
     print("Install with: pip install reportlab")
@@ -120,8 +117,8 @@ def create_gcash_statement():
 
     c.save()
     print(f"✓ Created: {output_path}")
-    print(f"  Transactions: 28")
-    print(f"  Date format: MMM DD, YYYY")
+    print("  Transactions: 28")
+    print("  Date format: MMM DD, YYYY")
 
 
 def create_bpi_statement():
@@ -190,9 +187,9 @@ def create_bpi_statement():
 
     c.save()
     print(f"✓ Created: {output_path}")
-    print(f"  Transactions: 10")
-    print(f"  Date format: MM/DD/YYYY")
-    print(f"  Note: Non-protected version (use pdftk to add password)")
+    print("  Transactions: 10")
+    print("  Date format: MM/DD/YYYY")
+    print("  Note: Non-protected version (use pdftk to add password)")
 
 
 def create_maya_wallet_statement():
@@ -258,9 +255,9 @@ def create_maya_wallet_statement():
 
     c.save()
     print(f"✓ Created: {output_path}")
-    print(f"  Transactions: 13")
-    print(f"  Date format: ISO (YYYY-MM-DD)")
-    print(f"  Transaction types: Cash In, QR Payment, Send Money, Bills Payment")
+    print("  Transactions: 13")
+    print("  Date format: ISO (YYYY-MM-DD)")
+    print("  Transaction types: Cash In, QR Payment, Send Money, Bills Payment")
 
 
 def create_readme():

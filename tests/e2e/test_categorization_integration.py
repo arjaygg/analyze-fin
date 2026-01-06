@@ -5,9 +5,11 @@ Story: Categorization Integration
 Priority: P1 (High)
 """
 
-import pytest
 from datetime import datetime
 from decimal import Decimal
+
+import pytest
+
 from analyze_fin.categorization.categorizer import Categorizer
 from analyze_fin.parsers.base import RawTransaction
 
@@ -43,21 +45,21 @@ def test_categorize_and_process_transactions():
             amount=Decimal("-50.00")
         )
     ]
-    
+
     # WHEN
     results = categorizer.categorize_transactions(transactions)
-    
+
     # THEN
     assert len(results) == 3
-    
+
     # Check Jollibee (Food & Dining)
     assert results[0].category == "Food & Dining"
     assert results[0].confidence > 0.9
     assert results[0].merchant_normalized == "Jollibee"
-    
+
     # Check Meralco (Bills)
     assert results[1].category == "Bills & Utilities"
-    
+
     # Check Unknown
     assert results[2].category == "Uncategorized"
     assert results[2].confidence == 0.0
@@ -72,10 +74,10 @@ def test_categorizer_consistency():
     """
     categorizer = Categorizer()
     description = "GRAB RIDE"
-    
+
     result1 = categorizer.categorize(description)
     result2 = categorizer.categorize(description)
-    
+
     assert result1.category == result2.category
     assert result1.confidence == result2.confidence
 

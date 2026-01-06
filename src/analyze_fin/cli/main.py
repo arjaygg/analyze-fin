@@ -11,9 +11,13 @@ Commands:
 - report: Generate spending reports
 """
 
+from __future__ import annotations
+
 import json
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
+from pathlib import Path
+from typing import Annotated
 
 import typer
 from rich.console import Console
@@ -29,9 +33,120 @@ app = typer.Typer(
 # Rich console for pretty output
 console = Console()
 
+# Global state for CLI options
+_cli_database: str | None = None
+
+
+def _version_callback(value: bool) -> None:
+    """Callback for --version flag."""
+    if value:
+        from analyze_fin import __version__
+
+        console.print(f"[bold]analyze-fin[/bold] version {__version__}")
+        console.print("Philippine Personal Finance Tracker")
+        raise typer.Exit()
+
+
+@app.callback()
+def main_callback(
+    database: Annotated[
+        str | None,
+        typer.Option(
+            "--database",
+            "-D",
+            help="Path to database file (overrides config)",
+            envvar="ANALYZE_FIN_DATABASE_PATH",
+        ),
+    ] = None,
+    config_path: Annotated[
+        Path | None,
+        typer.Option(
+            "--config",
+            "-C",
+            help="Path to config file (default: ~/.analyze-fin/config.yaml)",
+        ),
+    ] = None,
+    batch: Annotated[
+        bool,
+        typer.Option(
+            "--batch",
+            help="Run in batch mode (no prompts, use defaults)",
+        ),
+    ] = False,
+    yes: Annotated[
+        bool,
+        typer.Option(
+            "--yes",
+            "-y",
+            help="Auto-confirm all yes/no prompts",
+        ),
+    ] = False,
+    quiet: Annotated[
+        bool,
+        typer.Option(
+            "--quiet",
+            "-q",
+            help="Suppress non-error output (exit code still indicates success/failure)",
+        ),
+    ] = False,
+    verbose: Annotated[
+        bool,
+        typer.Option(
+            "--verbose",
+            "-v",
+            help="Enable verbose output with debug information",
+        ),
+    ] = False,
+    version: Annotated[
+        bool | None,
+        typer.Option(
+            "--version",
+            "-V",
+            help="Show version and exit",
+            callback=_version_callback,
+            is_eager=True,
+        ),
+    ] = None,
+) -> None:
+    """analyze-fin: Local-first Philippine bank statement analyzer.
+
+    Configure default settings in ~/.analyze-fin/config.yaml or use
+    environment variables with ANALYZE_FIN_ prefix.
+
+    Flags:
+      --batch     Automation mode (no prompts, use defaults)
+      --yes/-y    Auto-confirm prompts (keep other interactive features)
+      --quiet/-q  Suppress output (errors still shown, exit codes work)
+      --verbose   Show debug information and full error tracebacks
+
+    Exit codes: 0=success, 1=error, 2=parse error, 3=config error, 4=db error
+    """
+    global _cli_database
+
+    from analyze_fin.cli.formatters import set_quiet_mode, set_verbose_mode
+    from analyze_fin.cli.prompts import set_mode_state
+    from analyze_fin.config import ConfigManager
+    from analyze_fin.database.session import set_config
+
+    # Set CLI mode state for prompts module
+    set_mode_state(batch=batch, yes=yes)
+
+    # Set quiet/verbose mode for formatters
+    set_quiet_mode(quiet)
+    set_verbose_mode(verbose)
+
+    # Initialize config manager
+    config = ConfigManager(config_path)
+
+    # Store CLI database override for commands
+    _cli_database = database
+
+    # Inject config into database session module
+    set_config(config)
+
 
 # Valid output formats for query command
-VALID_FORMATS = ("pretty", "json", "csv")
+VALID_FORMATS = ("pretty", "json", "csv", "html", "markdown")
 
 
 def _parse_date_range(date_range: str) -> tuple[datetime | None, datetime | None]:
@@ -305,7 +420,8 @@ def parse(
         None,
         "--password",
         "-p",
-        help="Password for encrypted PDFs (BPI statements)"
+        help="Password for encrypted PDFs (BPI statements)",
+        envvar="ANALYZE_FIN_BPI_PASSWORD",
     ),
     dry_run: bool = typer.Option(
         False,
@@ -329,6 +445,10 @@ def parse(
     Automatically detects bank type (GCash, BPI, Maya) from PDF content.
     Imports transactions to local SQLite database.
 
+    In batch mode (--batch flag):
+    - Uses ANALYZE_FIN_BPI_PASSWORD env var for encrypted PDFs
+    - No interactive prompts - uses defaults for all decisions
+
     Examples:
         # Parse single statement
         analyze-fin parse statement.pdf
@@ -341,12 +461,17 @@ def parse(
 
         # Preview without saving
         analyze-fin parse statement.pdf --dry-run
+
+        # Batch mode (for scripting)
+        ANALYZE_FIN_BPI_PASSWORD=SURNAME1234 analyze-fin --batch parse *.pdf
     """
+    import os
     from pathlib import Path
 
     from sqlalchemy.orm import Session
 
-    from analyze_fin.database.models import Account, Statement, Transaction
+    from analyze_fin.cli.prompts import is_batch_mode, prompt_for_input
+    from analyze_fin.database.models import Statement, Transaction
     from analyze_fin.database.session import init_db
     from analyze_fin.parsers.batch import BatchImporter
 
@@ -362,67 +487,128 @@ def parse(
             console.print(f"[red]Error:[/red] File not found: {path}")
             raise typer.Exit(code=1)
 
-    console.print(f"[bold]Parsing {len(paths)} statement(s)...[/bold]\n")
+    # Check if any files might need password (BPI detection by filename pattern)
+    needs_password = any("bpi" in str(p).lower() for p in paths)
+
+    # Handle password in interactive vs batch mode
+    effective_password = password
+    if needs_password and not password:
+        # Check env var first (batch mode or as fallback)
+        env_password = os.environ.get("ANALYZE_FIN_BPI_PASSWORD")
+        if env_password:
+            effective_password = env_password
+        elif not is_batch_mode():
+            # Interactive mode: prompt for password
+            effective_password = prompt_for_input(
+                "Enter BPI statement password:",
+                password=True,
+            )
+
+    if not is_batch_mode():
+        console.print(f"[bold]Parsing {len(paths)} statement(s)...[/bold]\n")
 
     # Create importer and parse
     importer = BatchImporter()
-    passwords = {str(p): password for p in paths} if password else {}
+    passwords = {str(p): effective_password for p in paths} if effective_password else {}
 
     try:
+        from rich.progress import BarColumn, Progress, SpinnerColumn, TaskID, TextColumn
+
+        # Progress tracking with Rich Progress bar in interactive mode
+        progress_context: Progress | None = None
+        progress_task: TaskID | None = None
+
+        if not is_batch_mode():
+            progress_context = Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                BarColumn(),
+                TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+                TextColumn("({task.completed}/{task.total})"),
+                console=console,
+            )
+            progress_context.start()
+            progress_task = progress_context.add_task("Parsing...", total=len(paths))
+
+        def progress_callback(curr: int, total: int, file: Path, status: str) -> None:
+            if progress_context and progress_task is not None:
+                progress_context.update(
+                    progress_task,
+                    completed=curr,
+                    description=f"[cyan]{file.name}[/cyan]: {status}",
+                )
+
+        progress_cb = progress_callback if not is_batch_mode() else None
+
         result = importer.import_all(
             pdf_paths=paths,
             passwords=passwords,
-            progress_callback=lambda curr, total, file, status: console.print(
-                f"[dim]{curr}/{total}[/dim] {file.name}: {status}"
-            )
+            progress_callback=progress_cb,
         )
 
-        # Display parsing results
-        console.print()
-        console.print("[green]✓[/green] Parsing complete!")
-        console.print(f"  Total files: {result.total_files}")
-        console.print(f"  Successful: {result.successful}")
-        console.print(f"  Failed: {result.failed}")
+        # Stop progress bar before showing results
+        if progress_context:
+            progress_context.stop()
 
-        if result.successful > 0:
+        # Display parsing results (verbose in interactive, minimal in batch)
+        if not is_batch_mode():
+            console.print()
+            console.print("[green]✓[/green] Parsing complete!")
+            console.print(f"  Total files: {result.total_files}")
+            console.print(f"  Successful: {result.successful}")
+            console.print(f"  Failed: {result.failed}")
+
+        if result.successful > 0 and not is_batch_mode():
             console.print(f"  Quality: {result.get_confidence_label()} ({result.average_quality_score:.1%})")
             total_transactions = sum(len(r.transactions) for r in result.results)
             console.print(f"  Transactions: {total_transactions}")
 
-        # Show errors if any
+        # Show errors if any (always show errors, even in batch mode)
         if result.errors:
-            console.print("\n[yellow]Errors:[/yellow]")
+            if not is_batch_mode():
+                console.print("\n[yellow]Errors:[/yellow]")
             for file_path, error in result.errors:
-                console.print(f"  [red]✗[/red] {file_path}: {error}")
+                console.print(f"ERROR: {file_path}: {error}" if is_batch_mode() else f"  [red]✗[/red] {file_path}: {error}")
 
-        # Show duplicates if any
-        if result.duplicates:
+        # Show duplicates if any (interactive only)
+        if result.duplicates and not is_batch_mode():
             console.print("\n[dim]Skipped duplicates:[/dim]")
             for file_path, reason in result.duplicates:
                 console.print(f"  [dim]→[/dim] {file_path}: {reason}")
 
         # Save to database (unless dry-run)
         if dry_run:
-            console.print("\n[yellow]Dry run:[/yellow] Transactions not saved to database.")
+            if not is_batch_mode():
+                console.print("\n[yellow]Dry run:[/yellow] Transactions not saved to database.")
         elif result.successful > 0:
-            console.print("\n[bold]Saving to database...[/bold]")
+            if not is_batch_mode():
+                console.print("\n[bold]Saving to database...[/bold]")
             saved_count = 0
             skipped_count = 0
+            accounts_used: set[int] = set()  # Track unique accounts
 
             with Session(engine) as session:
                 try:
                     for parse_result in result.results:
-                        # Get or create account based on bank type
-                        bank_type = parse_result.bank_type
-                        account = session.query(Account).filter_by(bank_type=bank_type).first()
+                        # Get or create account using multi-account support (Story 5.2)
+                        from analyze_fin.database.operations import (
+                            get_account_display_name,
+                            get_or_create_account,
+                        )
 
-                        if not account:
-                            account = Account(
-                                name=f"{bank_type.upper()} Account",
-                                bank_type=bank_type,
-                            )
-                            session.add(account)
-                            session.flush()  # Get account ID
+                        account = get_or_create_account(
+                            session,
+                            bank_type=parse_result.bank_type,
+                            account_number=parse_result.account_number,
+                            account_holder=parse_result.account_holder,
+                        )
+                        session.flush()  # Ensure account has ID
+
+                        # Display account info when first seen
+                        if not is_batch_mode() and account.id not in accounts_used:
+                            display_name = get_account_display_name(account)
+                            console.print(f"  [cyan]Account:[/cyan] {display_name}")
+                        accounts_used.add(account.id)
 
                         # Check if statement already exists (by file path)
                         existing_stmt = session.query(Statement).filter_by(
@@ -430,7 +616,8 @@ def parse(
                         ).first()
 
                         if existing_stmt:
-                            console.print(f"  [dim]Skipped (exists):[/dim] {parse_result.file_path}")
+                            if not is_batch_mode():
+                                console.print(f"  [dim]Skipped (exists):[/dim] {parse_result.file_path}")
                             skipped_count += len(parse_result.transactions)
                             continue
 
@@ -456,9 +643,10 @@ def parse(
                             saved_count += 1
 
                     session.commit()
-                    console.print(f"[green]✓[/green] Saved {saved_count} transactions to database")
-                    if skipped_count > 0:
-                        console.print(f"[dim]  Skipped {skipped_count} (already imported)[/dim]")
+                    if not is_batch_mode():
+                        console.print(f"[green]✓[/green] Saved {saved_count} transactions to database")
+                        if skipped_count > 0:
+                            console.print(f"[dim]  Skipped {skipped_count} (already imported)[/dim]")
 
                     # Unified workflow: Auto-categorize if enabled
                     categorized_count = 0
@@ -466,7 +654,8 @@ def parse(
                         from analyze_fin.categorization.categorizer import Categorizer
                         from analyze_fin.database.models import Transaction
 
-                        console.print("\n[bold]Auto-categorizing...[/bold]")
+                        if not is_batch_mode():
+                            console.print("\n[bold]Auto-categorizing...[/bold]")
                         categorizer = Categorizer()
 
                         # Only process uncategorized transactions (Task 1.5)
@@ -486,11 +675,12 @@ def parse(
 
                         total_transactions = saved_count
                         cat_pct = (categorized_count / total_transactions * 100) if total_transactions > 0 else 0
-                        console.print(f"[green]✓[/green] Categorized {categorized_count} of {total_transactions} ({cat_pct:.0f}%)")
+                        if not is_batch_mode():
+                            console.print(f"[green]✓[/green] Categorized {categorized_count} of {total_transactions} ({cat_pct:.0f}%)")
 
-                        # Suggest manual categorization if rate < 80%
-                        if cat_pct < 80:
-                            console.print("[yellow]Tip:[/yellow] Run `analyze-fin categorize` to manually review uncategorized transactions")
+                            # Suggest manual categorization if rate < 80%
+                            if cat_pct < 80:
+                                console.print("[yellow]Tip:[/yellow] Run `analyze-fin categorize` to manually review uncategorized transactions")
 
                     # Unified workflow: Check duplicates if enabled
                     duplicate_count = 0
@@ -498,7 +688,8 @@ def parse(
                         from analyze_fin.database.models import Transaction
                         from analyze_fin.dedup.detector import DuplicateDetector
 
-                        console.print("\n[bold]Checking for duplicates...[/bold]")
+                        if not is_batch_mode():
+                            console.print("\n[bold]Checking for duplicates...[/bold]")
 
                         # Load all transactions for duplicate check
                         all_transactions = session.query(Transaction).all()
@@ -517,31 +708,49 @@ def parse(
                         duplicates = detector.find_duplicates(tx_dicts)
                         duplicate_count = len(duplicates)
 
-                        if duplicate_count > 0:
-                            console.print(f"[yellow]⚠[/yellow] Found {duplicate_count} potential duplicate(s)")
-                            console.print("[dim]Run `analyze-fin deduplicate --review` to resolve[/dim]")
-                        else:
-                            console.print("[green]✓[/green] No duplicates found")
+                        if not is_batch_mode():
+                            if duplicate_count > 0:
+                                console.print(f"[yellow]⚠[/yellow] Found {duplicate_count} potential duplicate(s)")
+                                console.print("[dim]Run `analyze-fin deduplicate --review` to resolve[/dim]")
+                            else:
+                                console.print("[green]✓[/green] No duplicates found")
 
-                    # Display unified summary (Task 2)
-                    console.print("\n[bold]📊 Import Summary[/bold]")
-                    console.print(f"  Imported: {saved_count} transactions")
-                    if auto_categorize:
-                        uncategorized_remaining = saved_count - categorized_count
-                        console.print(f"  Categorized: {categorized_count} ({categorized_count * 100 // max(saved_count, 1)}%)")
-                        if uncategorized_remaining > 0:
-                            console.print(f"  Uncategorized: {uncategorized_remaining}")
-                    if check_duplicates and duplicate_count > 0:
+                    # Display unified summary
+                    if is_batch_mode():
+                        # Batch mode: machine-readable summary
+                        cat_pct = (categorized_count * 100 // max(saved_count, 1)) if auto_categorize else 0
+                        summary_parts = [f"imported={saved_count}"]
+                        if auto_categorize:
+                            summary_parts.append(f"categorized={categorized_count}({cat_pct}%)")
+                        if check_duplicates and duplicate_count > 0:
+                            summary_parts.append(f"duplicates={duplicate_count}")
+                        console.print(" ".join(summary_parts))
+                    else:
+                        # Interactive mode: friendly summary
+                        console.print("\n[bold]📊 Import Summary[/bold]")
+                        console.print(f"  Imported: {saved_count} transactions")
+                        if auto_categorize:
+                            uncategorized_remaining = saved_count - categorized_count
+                            console.print(f"  Categorized: {categorized_count} ({categorized_count * 100 // max(saved_count, 1)}%)")
+                            if uncategorized_remaining > 0:
+                                console.print(f"  Uncategorized: {uncategorized_remaining}")
+                    if check_duplicates and duplicate_count > 0 and not is_batch_mode():
                         console.print(f"  Duplicate warnings: {duplicate_count}")
 
                 except Exception as e:
                     session.rollback()
+                    if progress_context:
+                        progress_context.stop()
                     console.print(f"[red]Error saving to database:[/red] {e}")
                     raise typer.Exit(code=1) from None
 
     except typer.Exit:
+        if progress_context:
+            progress_context.stop()
         raise
     except Exception as e:
+        if progress_context:
+            progress_context.stop()
         console.print(f"[red]Error during parsing:[/red] {e}")
         raise typer.Exit(code=2) from None
 
@@ -897,6 +1106,11 @@ def categorize(
     """
     Auto-categorize transactions using rule-based matching.
 
+    In batch mode (--batch flag):
+    - Unknown merchants are automatically set to "Uncategorized"
+    - No interactive prompts for category selection
+    - Minimal output (count summary only)
+
     Examples:
         # Preview categorization changes
         analyze-fin categorize --dry-run
@@ -906,10 +1120,14 @@ def categorize(
 
         # Re-categorize all transactions
         analyze-fin categorize --all
+
+        # Batch mode for scripting
+        analyze-fin --batch categorize
     """
     from sqlalchemy.orm import Session
 
     from analyze_fin.categorization.categorizer import Categorizer
+    from analyze_fin.cli.prompts import is_batch_mode
     from analyze_fin.database.models import Transaction
     from analyze_fin.database.session import init_db
 
@@ -924,13 +1142,16 @@ def categorize(
             transactions = query.all()
 
             if not transactions:
-                console.print("[yellow]No transactions to categorize.[/yellow]")
+                if not is_batch_mode():
+                    console.print("[yellow]No transactions to categorize.[/yellow]")
                 return
 
-            console.print(f"[bold]Categorizing {len(transactions)} transactions...[/bold]\n")
+            if not is_batch_mode():
+                console.print(f"[bold]Categorizing {len(transactions)} transactions...[/bold]\n")
 
             categorizer = Categorizer()
             updates = []
+            uncategorized_count = 0
 
             for tx in transactions:
                 result = categorizer.categorize(tx.description)
@@ -942,32 +1163,38 @@ def categorize(
                         "confidence": result.confidence,
                         "method": result.method,
                     })
+                else:
+                    uncategorized_count += 1
 
             if not updates:
-                console.print("[yellow]No transactions could be categorized.[/yellow]")
+                if is_batch_mode():
+                    console.print(f"categorized=0 uncategorized={len(transactions)}")
+                else:
+                    console.print("[yellow]No transactions could be categorized.[/yellow]")
                 return
 
-            # Display results
-            table = Table(title=f"{'Preview: ' if dry_run else ''}Categorization Results")
-            table.add_column("Date", style="cyan")
-            table.add_column("Description")
-            table.add_column("Category", style="green")
-            table.add_column("Confidence", justify="right")
+            # Display results (interactive mode only)
+            if not is_batch_mode():
+                table = Table(title=f"{'Preview: ' if dry_run else ''}Categorization Results")
+                table.add_column("Date", style="cyan")
+                table.add_column("Description")
+                table.add_column("Category", style="green")
+                table.add_column("Confidence", justify="right")
 
-            for update in updates[:20]:  # Show first 20
-                table.add_row(
-                    update["tx"].date.strftime("%Y-%m-%d"),
-                    update["tx"].description[:30] + ("..." if len(update["tx"].description) > 30 else ""),
-                    update["category"],
-                    f"{update['confidence']:.0%}",
-                )
+                for update in updates[:20]:  # Show first 20
+                    table.add_row(
+                        update["tx"].date.strftime("%Y-%m-%d"),
+                        update["tx"].description[:30] + ("..." if len(update["tx"].description) > 30 else ""),
+                        update["category"],
+                        f"{update['confidence']:.0%}",
+                    )
 
-            console.print(table)
+                console.print(table)
 
-            if len(updates) > 20:
-                console.print(f"[dim]... and {len(updates) - 20} more[/dim]")
+                if len(updates) > 20:
+                    console.print(f"[dim]... and {len(updates) - 20} more[/dim]")
 
-            console.print(f"\n[bold]Total:[/bold] {len(updates)} transactions categorized")
+                console.print(f"\n[bold]Total:[/bold] {len(updates)} transactions categorized")
 
             if not dry_run:
                 # Apply updates
@@ -977,9 +1204,14 @@ def categorize(
                         update["tx"].merchant_normalized = update["merchant"]
 
                 session.commit()
-                console.print("[green]✓[/green] Changes saved to database")
+
+                if is_batch_mode():
+                    console.print(f"categorized={len(updates)} uncategorized={uncategorized_count}")
+                else:
+                    console.print("[green]✓[/green] Changes saved to database")
             else:
-                console.print("[yellow]Dry run:[/yellow] No changes saved")
+                if not is_batch_mode():
+                    console.print("[yellow]Dry run:[/yellow] No changes saved")
 
     except Exception as e:
         console.print(f"[red]Error categorizing:[/red] {e}")
@@ -997,15 +1229,24 @@ def deduplicate(
     """
     Detect and optionally remove duplicate transactions.
 
+    In batch mode (--batch flag):
+    - Defaults to keeping first transaction (skips duplicate)
+    - No interactive review prompts
+    - Summary reports duplicates found/skipped
+
     Examples:
         # Preview duplicate detection
         analyze-fin deduplicate
 
         # Remove duplicates (requires confirmation)
         analyze-fin deduplicate --apply
+
+        # Batch mode: auto-skip duplicates
+        analyze-fin --batch deduplicate --apply
     """
     from sqlalchemy.orm import Session
 
+    from analyze_fin.cli.prompts import is_batch_mode
     from analyze_fin.database.models import Transaction
     from analyze_fin.database.session import init_db
     from analyze_fin.dedup.detector import DuplicateDetector
@@ -1017,10 +1258,12 @@ def deduplicate(
             transactions = session.query(Transaction).all()
 
             if not transactions:
-                console.print("[yellow]No transactions to check for duplicates.[/yellow]")
+                if not is_batch_mode():
+                    console.print("[yellow]No transactions to check for duplicates.[/yellow]")
                 return
 
-            console.print(f"[bold]Checking {len(transactions)} transactions for duplicates...[/bold]\n")
+            if not is_batch_mode():
+                console.print(f"[bold]Checking {len(transactions)} transactions for duplicates...[/bold]\n")
 
             # Convert to dict format for detector
             tx_dicts = [
@@ -1038,38 +1281,98 @@ def deduplicate(
             duplicates = detector.find_duplicates(tx_dicts)
 
             if not duplicates:
-                console.print("[green]✓[/green] No duplicates found!")
+                if is_batch_mode():
+                    console.print("duplicates=0")
+                else:
+                    console.print("[green]✓[/green] No duplicates found!")
                 return
 
-            console.print(f"[yellow]Found {len(duplicates)} potential duplicate pairs:[/yellow]\n")
-
-            # Display duplicates
-            table = Table(title="Duplicate Transactions")
-            table.add_column("Type", style="cyan")
-            table.add_column("Confidence", justify="right")
-            table.add_column("Transaction A")
-            table.add_column("Transaction B")
-
-            for dup in duplicates[:10]:
-                tx_a = dup.transaction_a
-                tx_b = dup.transaction_b
-                table.add_row(
-                    dup.match_type,
-                    f"{dup.confidence:.0%}",
-                    f"{tx_a['date'].strftime('%Y-%m-%d')}: {tx_a['description'][:20]}...",
-                    f"{tx_b['date'].strftime('%Y-%m-%d')}: {tx_b['description'][:20]}...",
-                )
-
-            console.print(table)
-
-            if len(duplicates) > 10:
-                console.print(f"[dim]... and {len(duplicates) - 10} more[/dim]")
-
-            if dry_run:
-                console.print("\n[yellow]Dry run:[/yellow] Use --apply to remove duplicates")
+            if is_batch_mode():
+                # Batch mode: report count, auto-keep first if --apply
+                if dry_run:
+                    console.print(f"duplicates={len(duplicates)}")
+                else:
+                    # In batch mode with --apply: auto-remove duplicates (keep first)
+                    removed_count = 0
+                    for dup in duplicates:
+                        # Keep the one with lower ID (first imported), remove the other
+                        tx_to_remove_id = dup.transaction_b["id"]
+                        tx_to_remove = session.get(Transaction, tx_to_remove_id)
+                        if tx_to_remove:
+                            session.delete(tx_to_remove)
+                            removed_count += 1
+                    session.commit()
+                    console.print(f"duplicates={len(duplicates)} removed={removed_count}")
             else:
-                console.print("\n[yellow]Note:[/yellow] Automatic removal not yet implemented.")
-                console.print("[dim]Please review duplicates manually and remove via SQL if needed.[/dim]")
+                # Interactive mode: show details
+                console.print(f"[yellow]Found {len(duplicates)} potential duplicate pairs:[/yellow]\n")
+
+                # Display duplicates
+                table = Table(title="Duplicate Transactions")
+                table.add_column("Type", style="cyan")
+                table.add_column("Confidence", justify="right")
+                table.add_column("Transaction A")
+                table.add_column("Transaction B")
+
+                for dup in duplicates[:10]:
+                    tx_a = dup.transaction_a
+                    tx_b = dup.transaction_b
+                    table.add_row(
+                        dup.match_type,
+                        f"{dup.confidence:.0%}",
+                        f"{tx_a['date'].strftime('%Y-%m-%d')}: {tx_a['description'][:20]}...",
+                        f"{tx_b['date'].strftime('%Y-%m-%d')}: {tx_b['description'][:20]}...",
+                    )
+
+                console.print(table)
+
+                if len(duplicates) > 10:
+                    console.print(f"[dim]... and {len(duplicates) - 10} more[/dim]")
+
+                if dry_run:
+                    console.print("\n[yellow]Dry run:[/yellow] Use --apply to remove duplicates")
+                else:
+                    # Interactive mode with --apply: prompt for each duplicate
+                    from analyze_fin.cli.prompts import prompt_choice
+
+                    console.print("\n[bold]Processing duplicates...[/bold]")
+                    removed_count = 0
+                    kept_both = 0
+
+                    for i, dup in enumerate(duplicates, 1):
+                        tx_a = dup.transaction_a
+                        tx_b = dup.transaction_b
+
+                        console.print(f"\n[cyan]Duplicate {i}/{len(duplicates)}[/cyan] ({dup.match_type}, {dup.confidence:.0%} confidence)")
+                        console.print(f"  A: {tx_a['date'].strftime('%Y-%m-%d')} | {tx_a['description'][:40]} | {tx_a['amount']}")
+                        console.print(f"  B: {tx_b['date'].strftime('%Y-%m-%d')} | {tx_b['description'][:40]} | {tx_b['amount']}")
+
+                        choice = prompt_choice(
+                            "Action",
+                            ["Keep both", "Keep First", "Keep Second"],
+                            default_index=1,  # Default: keep first (remove second)
+                        )
+
+                        if choice == "Keep First":
+                            # Remove transaction B
+                            tx_to_remove = session.get(Transaction, tx_b["id"])
+                            if tx_to_remove:
+                                session.delete(tx_to_remove)
+                                removed_count += 1
+                                console.print("  [dim]→ Removed B[/dim]")
+                        elif choice == "Keep Second":
+                            # Remove transaction A
+                            tx_to_remove = session.get(Transaction, tx_a["id"])
+                            if tx_to_remove:
+                                session.delete(tx_to_remove)
+                                removed_count += 1
+                                console.print("  [dim]→ Removed A[/dim]")
+                        else:
+                            kept_both += 1
+                            console.print("  [dim]→ Kept both[/dim]")
+
+                    session.commit()
+                    console.print(f"\n[green]✓[/green] Removed {removed_count} duplicates, kept both for {kept_both} pairs")
 
     except Exception as e:
         console.print(f"[red]Error detecting duplicates:[/red] {e}")
@@ -1200,7 +1503,9 @@ def ask(
 @app.command()
 def version() -> None:
     """Show version information."""
-    console.print("[bold]analyze-fin[/bold] version 0.1.0")
+    from analyze_fin import __version__
+
+    console.print(f"[bold]analyze-fin[/bold] version {__version__}")
     console.print("Philippine Personal Finance Tracker")
 
 

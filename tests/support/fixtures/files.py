@@ -1,8 +1,10 @@
 """
 Fixtures for file paths and handling.
 """
-import pytest
 from pathlib import Path
+
+import pytest
+
 
 @pytest.fixture
 def real_bpi_pdf_path() -> Path:

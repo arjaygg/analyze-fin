@@ -7,7 +7,7 @@ from typing import Any
 def assert_model_matches(model_instance: Any, expected_data: dict[str, Any]) -> None:
     """
     Assert that a SQLAlchemy model instance matches expected data.
-    
+
     Args:
         model_instance: The model object to check
         expected_data: Dictionary of expected field values
@@ -15,12 +15,12 @@ def assert_model_matches(model_instance: Any, expected_data: dict[str, Any]) -> 
     for key, value in expected_data.items():
         assert hasattr(model_instance, key), f"Model {model_instance} missing attribute {key}"
         actual_value = getattr(model_instance, key)
-        
+
         # Handle Decimal comparison
         if isinstance(actual_value, Decimal) and not isinstance(value, Decimal):
              if isinstance(value, (str, int, float)):
                  value = Decimal(str(value))
-                 
+
         assert actual_value == value, f"Field {key}: expected {value}, got {actual_value}"
 
 
@@ -29,21 +29,21 @@ def assert_valid_iso_date(date_str: str) -> None:
     from datetime import datetime
     try:
         datetime.strptime(date_str, "%Y-%m-%d")
-    except ValueError:
-        raise AssertionError(f"String '{date_str}' is not a valid ISO date (YYYY-MM-DD)")
+    except ValueError as e:
+        raise AssertionError(f"String '{date_str}' is not a valid ISO date (YYYY-MM-DD)") from e
 
 
 def assert_valid_currency(amount_str: str) -> None:
     """Assert that a string is a valid currency amount."""
     try:
         float(amount_str)
-    except ValueError:
-        raise AssertionError(f"String '{amount_str}' is not a valid currency amount")
+    except ValueError as e:
+        raise AssertionError(f"String '{amount_str}' is not a valid currency amount") from e
 
 
 def assert_transaction_valid(transaction: Any) -> None:
     """Assert that a transaction has all required fields.
-    
+
     Supports both dict and object with attributes.
     """
     required_fields = ["date", "description", "amount"]
@@ -84,14 +84,15 @@ def assert_quality_score_valid(score: float) -> None:
 
 def assert_no_duplicates(transactions: list[Any], key_func: Any = None) -> None:
     """Assert no duplicate transactions in list.
-    
+
     Args:
         transactions: List of transactions
         key_func: Optional function to extract comparison key
     """
     if key_func is None:
-        key_func = lambda tx: (tx.date, tx.description, str(tx.amount))
-    
+        def key_func(tx):
+            return (tx.date, tx.description, str(tx.amount))
+
     seen = set()
     for tx in transactions:
         key = key_func(tx)

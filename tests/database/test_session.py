@@ -43,7 +43,7 @@ class TestGetEngine:
         from analyze_fin.database.session import get_engine
 
         db_path = str(tmp_path / "subdir" / "nested" / "test.db")
-        engine = get_engine(db_path)
+        get_engine(db_path)
 
         assert Path(db_path).parent.exists()
 
@@ -96,17 +96,26 @@ class TestGetEngine:
         # Just verify engine was created with echo capability
         assert engine.echo is True
 
-    def test_get_engine_uses_default_path_when_none(self):
+    def test_get_engine_uses_default_path_when_none(self, monkeypatch):
         """
-        GIVEN no database path (None)
+        GIVEN no database path (None) and no config
         WHEN get_engine is called
-        THEN uses DEFAULT_DB_PATH.
+        THEN uses DEFAULT_DB_PATH (legacy fallback).
         """
-        from analyze_fin.database.session import DEFAULT_DB_PATH, get_engine
+        import analyze_fin.database.session as session_mod
+        from analyze_fin.config import ConfigManager
 
-        engine = get_engine(None)
+        # Reset config state to test legacy fallback
+        ConfigManager.reset_instance()
+        monkeypatch.setattr(session_mod, "_config", None)
 
-        assert DEFAULT_DB_PATH in str(engine.url)
+        engine = session_mod.get_engine(None)
+
+        # Should use the legacy DEFAULT_DB_PATH when no config is set
+        assert session_mod.DEFAULT_DB_PATH in str(engine.url)
+
+        # Cleanup
+        ConfigManager.reset_instance()
 
 
 class TestGetSession:

@@ -3,48 +3,56 @@
 ## Running Tests
 
 ```bash
-# All tests
-pytest
+# All tests (recommended via uv)
+uv run pytest
 
 # Verbose output
-pytest -v
+uv run pytest -v
 
 # Specific file
-pytest tests/test_cli.py
+uv run pytest tests/cli/test_version.py
 
 # Specific test
-pytest tests/test_cli.py::test_version_command
+uv run pytest tests/cli/test_version.py::TestVersionCommand::test_version_command_exits_successfully
 
 # By marker
-pytest -m unit           # Fast unit tests only
-pytest -m integration    # Integration tests
-pytest -m "not slow"     # Exclude slow tests
+uv run pytest -m "not atdd"              # Default signal (excludes RED/ATDD suite)
+uv run pytest -m "not atdd and not slow" # Fast local loop
+uv run pytest -m unit                    # Fast unit tests only
+uv run pytest -m integration             # Integration tests
+uv run pytest -m atdd                    # ATDD/RED suite (xfail(strict) until implemented)
+uv run pytest -m "not slow"              # Exclude slow tests (PDF parsing, etc.)
+uv run pytest -m real_pdf                # Opt-in tests that parse real/sample PDFs (skipped by default)
+
+# Opt-in: real PDF parsing E2E tests
+uv run pytest --run-real-pdf -m "real_pdf and e2e"
+RUN_REAL_PDF_E2E=1 uv run pytest -m "real_pdf and e2e"
 
 # Pattern matching
-pytest -k "transaction"  # Tests with "transaction" in name
+uv run pytest -k "transaction"  # Tests with "transaction" in name
 
 # Stop at first failure
-pytest -x
+uv run pytest -x
 
 # Show local variables on failure
-pytest -l
+uv run pytest -l
 
 # Parallel execution (if pytest-xdist installed)
-pytest -n auto
+uv run pytest -n auto
 ```
 
 ## Coverage
 
 ```bash
 # Run with coverage
-pytest --cov=src/analyze_fin
+uv run pytest --cov=analyze_fin
 
 # HTML report
-pytest --cov=src/analyze_fin --cov-report=html
+uv run pytest --cov=analyze_fin --cov-report=html
 open htmlcov/index.html
 
 # Show missing lines
-pytest --cov=src/analyze_fin --cov-report=term-missing
+uv run pytest --cov=analyze_fin --cov-report=term-missing
 ```
 
 ## Writing Tests
@@ -104,10 +112,13 @@ from tests.support.helpers import (
 @pytest.mark.unit           # Fast, isolated tests
 @pytest.mark.integration    # Database, file I/O
 @pytest.mark.slow          # Slow tests (PDF parsing)
+@pytest.mark.atdd          # Acceptance tests (often RED/xfail until implemented)
 @pytest.mark.parser        # Parser-specific
 @pytest.mark.database      # Database-specific
 @pytest.mark.cli           # CLI command tests
 @pytest.mark.smoke         # Smoke tests
+@pytest.mark.e2e           # Workflow-level tests
+@pytest.mark.performance   # NFR/performance checks
 ```
 
 ## Parametrized Tests

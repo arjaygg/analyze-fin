@@ -1,79 +1,91 @@
-# Test Suite Documentation
+# Test Suite (pytest)
 
 ## Overview
 
-This test suite ensures the quality and reliability of the `analyze-fin` application. It covers End-to-End (E2E), Integration, and Unit tests.
+This repository uses **pytest**. Tests are organized by feature area (CLI, parsers, queries, reports, etc.) and tagged with markers for selective runs.
 
-## Structure
+## Structure (high level)
 
-```
-tests/
-├── e2e/                # End-to-End tests (User workflows, CLI, Real file parsing)
-├── integration/        # Integration tests (Database, multiple components)
-├── unit/               # Unit tests (Individual functions/classes)
-├── fixtures/           # Data fixtures (PDFs, DB dumps)
-├── support/            # Test support code
-│   ├── factories/      # Data factories (Transactions, Accounts)
-│   ├── fixtures/       # Pytest fixtures (Files, DB sessions)
-│   └── helpers/        # Helper utilities (Assertions)
-└── conftest.py         # Global pytest configuration
-```
+- **`tests/analysis/`**: analysis logic
+- **`tests/categorization/`**: categorizer + learning/normalization
+- **`tests/cli/`**: Typer CLI tests (split into focused modules)
+- **`tests/database/`**: SQLAlchemy models/session
+- **`tests/dedup/`**: dedup detector/resolver
+- **`tests/e2e/`**: workflow-level tests
+- **`tests/export/`**: exporting logic
+- **`tests/parsers/`**: PDF parser tests
+- **`tests/queries/`**: query engine + NL parsing
+- **`tests/reports/`**: report + chart generation
+- **`tests/fixtures/`**: sample PDFs + fixture docs
+- **`tests/support/`**: shared factories/helpers/fixtures
 
-## Running Tests
+## Running tests
 
-We use `pytest` for test execution.
+We recommend running via `uv` for consistent environments:
 
 ```bash
-# Run all tests
-pytest
+# Full suite (includes ATDD + slow tests)
+uv run pytest
 
-# Run by priority
-pytest -m p0  # Critical paths
-pytest -m p1  # High priority
-pytest -m p2  # Medium priority
+# Recommended dev default: exclude ATDD + slow
+uv run pytest -m "not atdd and not slow"
 
-# Run specific type
-pytest tests/e2e
-pytest -m "not slow"
+# Exclude ATDD only (keeps slow tests)
+uv run pytest -m "not atdd"
 
-# Run with coverage
-pytest --cov=src/analyze_fin
+# ATDD/RED suite only (often xfail(strict) until implemented)
+uv run pytest -m atdd
+
+# Slow tests only / exclude slow tests
+uv run pytest -m slow
+uv run pytest -m "not slow"
 ```
 
-## Priority Levels
+## Markers / selection
 
-- **[P0] Critical**: Core user paths (Parsing, Categorization, CLI basics). Run on every commit.
-- **[P1] High**: Important features (Export, specific bank formats). Run on PR.
-- **[P2] Medium**: Edge cases, error handling. Run nightly.
-- **[P3] Low**: Niche cases. Run weekly.
+Registered markers live in `pytest.ini`. Common ones:
 
-## Writing Tests
+- **`atdd`**: acceptance tests (typically `xfail(strict=True)` until implemented)
+- **`unit`**, **`integration`**
+- **`slow`**, **`performance`**
+- **`e2e`**
+- **`parser`**, **`database`**, **`categorization`**, **`cli`**, **`smoke`**
+- **`p0/p1/p2/p3`**: priority bands (optional selection)
 
-### Guidelines
+Examples:
 
-1. **Given-When-Then**: Structure tests clearly.
-2. **Atomic**: One concept per test.
-3. **Factories**: Use `tests/support/factories` for creating data.
-4. **Markers**: Tag tests with `@pytest.mark.pX` and type (e.g., `@pytest.mark.e2e`).
-
-### Example
-
-```python
-@pytest.mark.unit
-@pytest.mark.p1
-def test_valid_email():
-    # GIVEN a valid email
-    email = "user@example.com"
-    
-    # WHEN validated
-    result = validate_email(email)
-    
-    # THEN it returns True
-    assert result is True
+```bash
+uv run pytest -m "p0 and not atdd"
+uv run pytest -m "e2e and not atdd"
+uv run pytest -m "cli and not slow"
 ```
 
-## Infrastructure
+## Reproducibility (determinism knobs)
 
-- **Fixtures**: Defined in `tests/conftest.py` and `tests/support/fixtures/`.
-- **Database**: Tests use an in-memory SQLite database or temporary file (via `temp_db_file` fixture).
-- **Real Files**: `tests/support/fixtures/files.py` provides paths to sample PDFs.
+Some test data uses deterministic helpers in `tests/support/helpers/determinism.py`.
+
+- **`TEST_SEED`**: seeds Python `random` (default `0`)
+- **`TEST_NOW`**: fixed clock (ISO format, default `2024-11-15T10:00:00`)
+
+Example:
+
+```bash
+TEST_SEED=123 TEST_NOW=2024-01-01T00:00:00 uv run pytest -m "not atdd"
+```
+
+## Opt-in tests (real PDFs)
+
+Some E2E tests parse real/sample PDF files and are **skipped by default** to keep CI and local runs deterministic.
+
+Run them explicitly with either:
+
+```bash
+uv run pytest -m "real_pdf and e2e"
+uv run pytest --run-real-pdf -m "e2e and slow"
+RUN_REAL_PDF_E2E=1 uv run pytest -m "real_pdf"
+```
+
+## Notes
+
+- **DB isolation**: most tests use an in-memory SQLite DB session fixture (`tests/conftest.py`).
+- **CLI isolation**: CLI tests use a temp DB fixture (`tests/cli/conftest.py::temp_db`) so they never touch your local/dev DB.

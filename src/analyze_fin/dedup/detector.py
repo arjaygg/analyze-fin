@@ -101,7 +101,7 @@ class DuplicateDetector:
         date_index = self._build_date_index(transactions)
 
         # Step 1: Find exact duplicates via content hash (highest confidence)
-        for tx_hash, indices in content_hash_index.items():
+        for _tx_hash, indices in content_hash_index.items():
             if len(indices) > 1:
                 for i in range(len(indices)):
                     for j in range(i + 1, len(indices)):
@@ -116,7 +116,7 @@ class DuplicateDetector:
                             seen_pairs.add(pair_key)
 
         # Step 2: Find duplicates via reference number
-        for ref_num, indices in reference_index.items():
+        for _ref_num, indices in reference_index.items():
             if len(indices) > 1:
                 for i in range(len(indices)):
                     for j in range(i + 1, len(indices)):
@@ -402,7 +402,7 @@ class DuplicateDetector:
     def _common_prefix_length(self, a: str, b: str) -> int:
         """Get length of common prefix between two strings."""
         length = 0
-        for char_a, char_b in zip(a, b):
+        for char_a, char_b in zip(a, b, strict=False):
             if char_a == char_b:
                 length += 1
             else:

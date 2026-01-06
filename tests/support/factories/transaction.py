@@ -5,6 +5,7 @@ from decimal import Decimal
 from analyze_fin.database.models import Transaction
 from tests.support.helpers.determinism import deterministic_uuid_hex, get_test_now
 
+
 def create_transaction(
     statement_id: int | None = None,
     amount: Decimal | str | float | None = None,
@@ -12,17 +13,17 @@ def create_transaction(
     **overrides
 ) -> Transaction:
     """Create a Transaction model instance with random data."""
-    
+
     # Handle amount types
     if amount is not None:
         if isinstance(amount, (float, str, int)):
             amount = Decimal(str(amount))
     else:
         amount = Decimal(f"{random.uniform(10.0, 5000.0):.2f}")
-        
+
     categories = ["Food & Dining", "Transportation", "Shopping", "Bills", "Groceries", None]
     merchants = ["Jollibee", "Grab", "7-Eleven", "Meralco", "SM Supermarket", "Unknown"]
-    
+
     defaults = {
         "statement_id": statement_id or random.randint(1, 1000),
         "date": date or get_test_now() - timedelta(days=random.randint(0, 30)),
@@ -36,7 +37,7 @@ def create_transaction(
         "is_duplicate": False,
         "duplicate_of_id": None,
     }
-    
+
     defaults.update(overrides)
     return Transaction(**defaults)
 

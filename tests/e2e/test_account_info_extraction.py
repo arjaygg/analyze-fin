@@ -14,7 +14,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from analyze_fin.parsers.base import ParseResult, RawTransaction
+from analyze_fin.parsers.base import ParseResult
 from analyze_fin.parsers.bpi import BPIParser
 from analyze_fin.parsers.gcash import GCashParser
 from analyze_fin.parsers.maya import MayaParser

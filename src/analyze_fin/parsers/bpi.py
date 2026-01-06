@@ -7,8 +7,8 @@ BPI (Bank of the Philippine Islands) statement format:
 - Table columns: Date | Description | Debit | Credit | Balance
 """
 
-import re
 import logging
+import re
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -280,7 +280,7 @@ class BPIParser(BaseBankParser):
                     description = "Transaction"
 
                 # Last number is balance, second-to-last is the amount
-                balance_str = numbers[-1]
+                numbers[-1]
                 amount_str = numbers[-2]
 
                 # Parse amount
