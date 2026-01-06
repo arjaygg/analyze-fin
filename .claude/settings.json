@@ -1,3 +1,38 @@
 {
-  "enableAllProjectMcpServers": true
+  "enableAllProjectMcpServers": true,
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/auto-code-review-on-edit.py\"",
+            "timeout": 10
+          },
+          {
+            "type": "prompt",
+            "prompt": "Check the previous hook output. If it indicates 'CODE REVIEW TRIGGERED' for a story file, you MUST immediately execute the BMAD code-review workflow using /bmad:bmm:workflows:code-review with the story_path provided. Do not ask for confirmation - execute the workflow now. If no code review was triggered, continue normally.",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/check-pending-reviews-on-stop.py\"",
+            "timeout": 10
+          },
+          {
+            "type": "prompt",
+            "prompt": "Check the previous hook output. If it indicates 'PENDING CODE REVIEWS DETECTED', you MUST run /bmad:bmm:workflows:code-review for each story listed before stopping. Do not skip this - complete all pending reviews. If no pending reviews were found, you may stop normally.",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
 }
