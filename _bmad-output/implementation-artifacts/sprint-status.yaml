@@ -85,25 +85,25 @@ development_status:
   epic-5: in-progress
   5-1-parser-account-identifier-extraction: done
   5-2-database-schema-multi-account-support: done  # Code review fixes applied 2026-01-06
-  5-3-account-context-in-reports-queries: backlog
-  5-4-account-scoped-deduplication: backlog
-  5-5-skill-updates-for-account-context: backlog
+  5-3-account-context-in-reports-queries: in-progress  # Dev started 2026-01-06
+  5-4-account-scoped-deduplication: ready-for-dev
+  5-5-skill-updates-for-account-context: ready-for-dev  # Story file created 2026-01-06
   epic-5-retrospective: optional
 
-# COMPLETION SUMMARY (as of 2026-01-06 - Epic 4 Complete):
+# COMPLETION SUMMARY (as of 2026-01-06):
 # =============================================
 # Total Stories: 28
-# Done: 22 (79%) - Stories 4-3, 4-4, 4-6, 5-2 completed
-# Ready for Dev: 0 (0%)
+# Done: 22 (79%)
+# Ready for Dev: 3 (11%) - Stories 5-3, 5-4, 5-5
 # Review: 0 (0%)
 # In Progress: 0 (0%)
-# Backlog: 3 (11%) - Remaining Epic 5 stories
+# Backlog: 0 (0%)
 #
 # Epic 1: 100% ✅ (5/5 stories done)
 # Epic 2: 100% ✅ (5/5 stories done)
 # Epic 3: 100% ✅ (6/6 stories done)
 # Epic 4: 100% ✅ (7/7 stories done) - COMPLETE!
-# Epic 5: 40% 🔄 (2/5 done, 3 backlog)
+# Epic 5: 40% 🔄 (2/5 done, 3 ready-for-dev)
 #
 # RECENT UPDATES (2026-01-06):
 # - Deleted 54 stale xfail ATDD tests (redundant with passing unit tests)
